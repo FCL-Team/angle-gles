@@ -10,8 +10,6 @@
 #include "common/vulkan/libvulkan_loader.h"
 
 #include "common/system_utils.h"
-
-#include <cstdlib>
  
 namespace angle
 {
@@ -19,9 +17,6 @@ namespace vk
 {
 void *OpenLibVulkan()
 {
-    if (std::getenv("VULKAN_PTR"))
-        return (void*) std::strtoul(std::getenv("VULKAN_PTR"), NULL, 0x10);
- 
     constexpr const char *kLibVulkanNames[] = {
 #if defined(ANGLE_PLATFORM_WINDOWS)
         "vulkan-1.dll",
