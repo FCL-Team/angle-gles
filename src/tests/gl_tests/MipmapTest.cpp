@@ -4,6 +4,10 @@
 // found in the LICENSE file.
 //
 
+#ifdef UNSAFE_BUFFERS_BUILD
+#    pragma allow_unsafe_buffers
+#endif
+
 #include "test_utils/ANGLETest.h"
 
 #include "test_utils/gl_raii.h"
@@ -557,6 +561,31 @@ TEST_P(MipmapTestES3, GenerateMipmap1x1Texture)
     // Then generate the mips.
     glGenerateMipmap(GL_TEXTURE_2D);
     ASSERT_GL_NO_ERROR();
+
+    // Verify that every mip is correct.
+    verifyAllMips(kTextureSize, kTextureSize, kInitialColor[0]);
+}
+
+// This test generates mipmaps twice in a row.
+TEST_P(MipmapTestES3, GenerateMipmapTwice)
+{
+    constexpr uint32_t kTextureSize = 1024;
+
+    const std::vector<GLColor> kInitialColor(kTextureSize * kTextureSize,
+                                             GLColor(35, 81, 184, 211));
+
+    // Create the texture.
+    glBindTexture(GL_TEXTURE_2D, mTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, kTextureSize, kTextureSize, 0, GL_RGBA,
+                 GL_UNSIGNED_BYTE, kInitialColor.data());
+
+    // Then generate the mips twice.
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    ASSERT_GL_NO_ERROR();
+
+    // Enable mipmaps.
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
 
     // Verify that every mip is correct.
     verifyAllMips(kTextureSize, kTextureSize, kInitialColor[0]);
@@ -2443,19 +2472,15 @@ TEST_P(MipmapTestES31, GenerateLowerMipsWithDraw)
 
 // Use this to select which configurations (e.g. which renderer, which GLES major version) these
 // tests should be run against.
-ANGLE_INSTANTIATE_TEST_ES2_AND_ES3(MipmapTest);
-
-namespace extraPlatforms
-{
-ANGLE_INSTANTIATE_TEST(MipmapTest,
-                       ES2_METAL().disable(Feature::AllowGenMultipleMipsPerPass),
-                       ES2_OPENGLES().enable(Feature::UseIntermediateTextureForGenerateMipmap));
+ANGLE_INSTANTIATE_TEST_ES2_AND_ES3_AND(
+    MipmapTest,
+    ES2_METAL().disable(Feature::AllowGenMultipleMipsPerPass),
+    ES2_OPENGLES().enable(Feature::UseIntermediateTextureForGenerateMipmap));
 
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(Mipmap3DBoxFilterTest);
 ANGLE_INSTANTIATE_TEST(Mipmap3DBoxFilterTest,
                        ES2_METAL(),
                        ES2_METAL().disable(Feature::AllowGenMultipleMipsPerPass));
-}  // namespace extraPlatforms
 
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(MipmapTestES3);
 ANGLE_INSTANTIATE_TEST_ES3_AND(MipmapTestES3, ES3_WEBGPU());

@@ -7,6 +7,10 @@
 // Framebuffer.cpp: Implements the gl::Framebuffer class. Implements GL framebuffer
 // objects and related functionality. [OpenGL ES 2.0.24] section 4.4 page 105.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+#    pragma allow_unsafe_buffers
+#endif
+
 #include "libANGLE/Framebuffer.h"
 
 #include "common/Optional.h"
@@ -60,7 +64,7 @@ FramebufferStatus CheckMultiviewStateMatchesForCompleteness(
     if (checkAttachment->getBaseViewIndex() + checkAttachment->getNumViews() >
         checkAttachment->getSize().depth)
     {
-        return FramebufferStatus::Incomplete(GL_FRAMEBUFFER_INCOMPLETE_VIEW_TARGETS_OVR,
+        return FramebufferStatus::Incomplete(GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT,
                                              err::kFramebufferIncompleteMultiviewBaseViewMismatch);
     }
 
@@ -215,13 +219,14 @@ FramebufferStatus CheckAttachmentSampleCompleteness(const Context *context,
 {
     ASSERT(attachment.isAttached());
 
+    GLsizei currRenderToTextureSamples = attachment.getRenderToTextureSamples();
     if (attachment.type() == GL_TEXTURE)
     {
         const Texture *texture = attachment.getTexture();
         ASSERT(texture);
         GLenum sizedInternalFormat    = attachment.getFormat().info->sizedInternalFormat;
         const TextureCaps &formatCaps = context->getTextureCaps().get(sizedInternalFormat);
-        if (static_cast<GLuint>(attachment.getSamples()) > formatCaps.getMaxSamples())
+        if (static_cast<GLuint>(attachment.getSamples()) > formatCaps.sampleCounts.getMaxSamples())
         {
             return FramebufferStatus::Incomplete(
                 GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE,
@@ -246,10 +251,11 @@ FramebufferStatus CheckAttachmentSampleCompleteness(const Context *context,
     {
         // Only check against RenderToTextureSamples if they actually exist.
         if (renderToTextureSamples->value() !=
-            FramebufferAttachment::kDefaultRenderToTextureSamples)
+                FramebufferAttachment::kDefaultRenderToTextureSamples ||
+            currRenderToTextureSamples != FramebufferAttachment::kDefaultRenderToTextureSamples)
         {
             FramebufferStatus sampleCountStatus =
-                CheckAttachmentSampleCounts(context, attachment.getRenderToTextureSamples(),
+                CheckAttachmentSampleCounts(context, currRenderToTextureSamples,
                                             renderToTextureSamples->value(), colorAttachment);
             if (!sampleCountStatus.isComplete())
             {
@@ -266,7 +272,8 @@ FramebufferStatus CheckAttachmentSampleCompleteness(const Context *context,
     {
         // RenderToTextureSamples takes precedence if they exist.
         if (renderToTextureSamples->value() ==
-            FramebufferAttachment::kDefaultRenderToTextureSamples)
+                FramebufferAttachment::kDefaultRenderToTextureSamples ||
+            currRenderToTextureSamples == FramebufferAttachment::kDefaultRenderToTextureSamples)
         {
 
             FramebufferStatus sampleCountStatus = CheckAttachmentSampleCounts(
@@ -1924,7 +1931,7 @@ void Framebuffer::setAttachment(const Context *context,
         ASSERT(info);
         GLenum sizedInternalFormat    = info->sizedInternalFormat;
         const TextureCaps &formatCaps = context->getTextureCaps().get(sizedInternalFormat);
-        samples                       = formatCaps.getNearestSamples(samples);
+        samples                       = formatCaps.sampleCounts.getNearestSamples(samples);
     }
 
     // Context may be null in unit tests.
@@ -1974,6 +1981,19 @@ void Framebuffer::setAttachmentMultiview(const Context *context,
 {
     setAttachment(context, type, binding, textureIndex, resource, numViews, baseViewIndex, true,
                   FramebufferAttachment::kDefaultRenderToTextureSamples);
+}
+
+void Framebuffer::setAttachmentMultisampleMultiview(const Context *context,
+                                                    GLenum type,
+                                                    GLenum binding,
+                                                    const ImageIndex &textureIndex,
+                                                    FramebufferAttachmentObject *resource,
+                                                    GLsizei samples,
+                                                    GLsizei numViews,
+                                                    GLint baseViewIndex)
+{
+    setAttachment(context, type, binding, textureIndex, resource, numViews, baseViewIndex, true,
+                  samples);
 }
 
 void Framebuffer::commitWebGL1DepthStencilIfConsistent(const Context *context,

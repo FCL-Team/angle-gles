@@ -46,13 +46,6 @@ struct TextureCaps
 
     // Set of supported sample counts, only guaranteed to be valid in ES3.
     SupportedSampleSet sampleCounts;
-
-    // Get the maximum number of samples supported
-    GLuint getMaxSamples() const;
-
-    // Get the number of supported samples that is at least as many as requested.  Returns 0 if
-    // there are no sample counts available
-    GLuint getNearestSamples(GLuint requestedSamples) const;
 };
 
 TextureCaps GenerateMinimumTextureCaps(GLenum internalFormat,
@@ -149,6 +142,11 @@ struct Limitations
     // TODO(http://anglebug.com/42263785): add validation code to front-end.
     bool noShadowSamplerCompareModeNone = false;
 
+    // Metal [[raster_order_group()]] does not work for read_write textures on AMD when the render
+    // pass doesn't have a color attachment on slot 0.
+    // http://anglebug.com/42266263
+    bool noRasterOrderGroupWithoutAttachmentZero = false;
+
     // PVRTC1 textures must be squares.
     bool squarePvrtc1 = false;
 
@@ -193,6 +191,20 @@ struct TypePrecision
 
     std::array<GLint, 2> range = {0, 0};
     GLint precision            = 0;
+};
+
+struct FragmentShadingRateProperties
+{
+    GLuint minFragmentShadingRateAttachmentTexelWidth;
+    GLuint minFragmentShadingRateAttachmentTexelHeight;
+    GLuint maxFragmentShadingRateAttachmentTexelWidth;
+    GLuint maxFragmentShadingRateAttachmentTexelHeight;
+    GLuint maxFragmentShadingRateAttachmentTexelAspectRatio;
+    GLuint maxFragmentShadingRateAttachmentLayers;
+    bool layeredShadingRateAttachments;
+    bool fragmentShadingRateNonTrivialCombinersSupport;
+    bool fragmentShadingRateWithShaderDepthStencilWritesSupport;
+    bool fragmentShadingRateWithSampleMaskSupport;
 };
 
 struct Caps
@@ -416,9 +428,13 @@ struct Caps
 
     // GL_ARM_shader_framebuffer_fetch
     bool fragmentShaderFramebufferFetchMRT = false;
+
+    // EXT_fragment_shading_rate
+    FragmentShadingRateProperties fragmentShadingRateProperties = {};
 };
 
 Caps GenerateMinimumCaps(const Version &clientVersion, const Extensions &extensions);
+
 }  // namespace gl
 
 namespace egl
@@ -700,6 +716,9 @@ struct DisplayExtensions
     // EGL_ANGLE_metal_shared_event_sync
     bool mtlSyncSharedEventANGLE = false;
 
+    // EGL_ANGLE_metal_commands_scheduled_sync
+    bool mtlSyncCommandsScheduledANGLE = false;
+
     // EGL_ANGLE_global_fence_sync
     bool globalFenceSyncANGLE = false;
 
@@ -711,6 +730,12 @@ struct DisplayExtensions
 
     // EGL_ANGLE_webgpu_texture_client_buffer
     bool webgpuTextureClientBuffer = false;
+
+    // EXT_ANGLE_create_context_passthrough_shaders
+    bool createContextPassthroughShadersANGLE = false;
+
+    // EGL_NV_context_priority_realtime
+    bool contextPriorityRealtimeNV = false;
 };
 
 struct DeviceExtensions

@@ -2366,6 +2366,14 @@ CallCapture ParseCallCapture(const Token &nameToken,
                 paramTokens, strings);
         return CallCapture(EntryPoint::GLFramebufferTextureLayer, std::move(params));
     }
+    if (strcmp(nameToken, "glFramebufferTextureMultisampleMultiviewOVR") == 0)
+    {
+        ParamBuffer params = ParseParameters<
+            std::remove_pointer<PFNGLFRAMEBUFFERTEXTUREMULTISAMPLEMULTIVIEWOVRPROC>::type>(
+            paramTokens, strings);
+        return CallCapture(EntryPoint::GLFramebufferTextureMultisampleMultiviewOVR,
+                           std::move(params));
+    }
     if (strcmp(nameToken, "glFramebufferTextureMultiviewOVR") == 0)
     {
         ParamBuffer params =
@@ -2586,13 +2594,6 @@ CallCapture ParseCallCapture(const Token &nameToken,
             paramTokens, strings);
         return CallCapture(EntryPoint::GLGetBooleani_v, std::move(params));
     }
-    if (strcmp(nameToken, "glGetBooleani_vRobustANGLE") == 0)
-    {
-        ParamBuffer params =
-            ParseParameters<std::remove_pointer<PFNGLGETBOOLEANI_VROBUSTANGLEPROC>::type>(
-                paramTokens, strings);
-        return CallCapture(EntryPoint::GLGetBooleani_vRobustANGLE, std::move(params));
-    }
     if (strcmp(nameToken, "glGetBooleanv") == 0)
     {
         ParamBuffer params =
@@ -2774,13 +2775,6 @@ CallCapture ParseCallCapture(const Token &nameToken,
             ParseParameters<std::remove_pointer<PFNGLGETFRAMEBUFFERPARAMETERIVMESAPROC>::type>(
                 paramTokens, strings);
         return CallCapture(EntryPoint::GLGetFramebufferParameterivMESA, std::move(params));
-    }
-    if (strcmp(nameToken, "glGetFramebufferParameterivRobustANGLE") == 0)
-    {
-        ParamBuffer params = ParseParameters<
-            std::remove_pointer<PFNGLGETFRAMEBUFFERPARAMETERIVROBUSTANGLEPROC>::type>(paramTokens,
-                                                                                      strings);
-        return CallCapture(EntryPoint::GLGetFramebufferParameterivRobustANGLE, std::move(params));
     }
     if (strcmp(nameToken, "glGetFramebufferPixelLocalStorageParameterfvANGLE") == 0)
     {
@@ -3049,13 +3043,6 @@ CallCapture ParseCallCapture(const Token &nameToken,
             paramTokens, strings);
         return CallCapture(EntryPoint::GLGetPointervKHR, std::move(params));
     }
-    if (strcmp(nameToken, "glGetPointervRobustANGLERobustANGLE") == 0)
-    {
-        ParamBuffer params =
-            ParseParameters<std::remove_pointer<PFNGLGETPOINTERVROBUSTANGLEROBUSTANGLEPROC>::type>(
-                paramTokens, strings);
-        return CallCapture(EntryPoint::GLGetPointervRobustANGLERobustANGLE, std::move(params));
-    }
     if (strcmp(nameToken, "glGetProgramBinary") == 0)
     {
         ParamBuffer params = ParseParameters<std::remove_pointer<PFNGLGETPROGRAMBINARYPROC>::type>(
@@ -3081,13 +3068,6 @@ CallCapture ParseCallCapture(const Token &nameToken,
             ParseParameters<std::remove_pointer<PFNGLGETPROGRAMINTERFACEIVPROC>::type>(paramTokens,
                                                                                        strings);
         return CallCapture(EntryPoint::GLGetProgramInterfaceiv, std::move(params));
-    }
-    if (strcmp(nameToken, "glGetProgramInterfaceivRobustANGLE") == 0)
-    {
-        ParamBuffer params =
-            ParseParameters<std::remove_pointer<PFNGLGETPROGRAMINTERFACEIVROBUSTANGLEPROC>::type>(
-                paramTokens, strings);
-        return CallCapture(EntryPoint::GLGetProgramInterfaceivRobustANGLE, std::move(params));
     }
     if (strcmp(nameToken, "glGetProgramPipelineInfoLog") == 0)
     {
@@ -3295,13 +3275,6 @@ CallCapture ParseCallCapture(const Token &nameToken,
                 paramTokens, strings);
         return CallCapture(EntryPoint::GLGetSamplerParameterIivOES, std::move(params));
     }
-    if (strcmp(nameToken, "glGetSamplerParameterIivRobustANGLE") == 0)
-    {
-        ParamBuffer params =
-            ParseParameters<std::remove_pointer<PFNGLGETSAMPLERPARAMETERIIVROBUSTANGLEPROC>::type>(
-                paramTokens, strings);
-        return CallCapture(EntryPoint::GLGetSamplerParameterIivRobustANGLE, std::move(params));
-    }
     if (strcmp(nameToken, "glGetSamplerParameterIuiv") == 0)
     {
         ParamBuffer params =
@@ -3322,13 +3295,6 @@ CallCapture ParseCallCapture(const Token &nameToken,
             ParseParameters<std::remove_pointer<PFNGLGETSAMPLERPARAMETERIUIVOESPROC>::type>(
                 paramTokens, strings);
         return CallCapture(EntryPoint::GLGetSamplerParameterIuivOES, std::move(params));
-    }
-    if (strcmp(nameToken, "glGetSamplerParameterIuivRobustANGLE") == 0)
-    {
-        ParamBuffer params =
-            ParseParameters<std::remove_pointer<PFNGLGETSAMPLERPARAMETERIUIVROBUSTANGLEPROC>::type>(
-                paramTokens, strings);
-        return CallCapture(EntryPoint::GLGetSamplerParameterIuivRobustANGLE, std::move(params));
     }
     if (strcmp(nameToken, "glGetSamplerParameterfv") == 0)
     {
@@ -3520,13 +3486,6 @@ CallCapture ParseCallCapture(const Token &nameToken,
                                                                                        strings);
         return CallCapture(EntryPoint::GLGetTexParameterIivOES, std::move(params));
     }
-    if (strcmp(nameToken, "glGetTexParameterIivRobustANGLE") == 0)
-    {
-        ParamBuffer params =
-            ParseParameters<std::remove_pointer<PFNGLGETTEXPARAMETERIIVROBUSTANGLEPROC>::type>(
-                paramTokens, strings);
-        return CallCapture(EntryPoint::GLGetTexParameterIivRobustANGLE, std::move(params));
-    }
     if (strcmp(nameToken, "glGetTexParameterIuiv") == 0)
     {
         ParamBuffer params =
@@ -3547,13 +3506,6 @@ CallCapture ParseCallCapture(const Token &nameToken,
             ParseParameters<std::remove_pointer<PFNGLGETTEXPARAMETERIUIVOESPROC>::type>(paramTokens,
                                                                                         strings);
         return CallCapture(EntryPoint::GLGetTexParameterIuivOES, std::move(params));
-    }
-    if (strcmp(nameToken, "glGetTexParameterIuivRobustANGLE") == 0)
-    {
-        ParamBuffer params =
-            ParseParameters<std::remove_pointer<PFNGLGETTEXPARAMETERIUIVROBUSTANGLEPROC>::type>(
-                paramTokens, strings);
-        return CallCapture(EntryPoint::GLGetTexParameterIuivRobustANGLE, std::move(params));
     }
     if (strcmp(nameToken, "glGetTexParameterfv") == 0)
     {
@@ -3760,13 +3712,6 @@ CallCapture ParseCallCapture(const Token &nameToken,
             paramTokens, strings);
         return CallCapture(EntryPoint::GLGetnUniformfvKHR, std::move(params));
     }
-    if (strcmp(nameToken, "glGetnUniformfvRobustANGLE") == 0)
-    {
-        ParamBuffer params =
-            ParseParameters<std::remove_pointer<PFNGLGETNUNIFORMFVROBUSTANGLEPROC>::type>(
-                paramTokens, strings);
-        return CallCapture(EntryPoint::GLGetnUniformfvRobustANGLE, std::move(params));
-    }
     if (strcmp(nameToken, "glGetnUniformiv") == 0)
     {
         ParamBuffer params = ParseParameters<std::remove_pointer<PFNGLGETNUNIFORMIVPROC>::type>(
@@ -3785,13 +3730,6 @@ CallCapture ParseCallCapture(const Token &nameToken,
             paramTokens, strings);
         return CallCapture(EntryPoint::GLGetnUniformivKHR, std::move(params));
     }
-    if (strcmp(nameToken, "glGetnUniformivRobustANGLE") == 0)
-    {
-        ParamBuffer params =
-            ParseParameters<std::remove_pointer<PFNGLGETNUNIFORMIVROBUSTANGLEPROC>::type>(
-                paramTokens, strings);
-        return CallCapture(EntryPoint::GLGetnUniformivRobustANGLE, std::move(params));
-    }
     if (strcmp(nameToken, "glGetnUniformuiv") == 0)
     {
         ParamBuffer params = ParseParameters<std::remove_pointer<PFNGLGETNUNIFORMUIVPROC>::type>(
@@ -3803,13 +3741,6 @@ CallCapture ParseCallCapture(const Token &nameToken,
         ParamBuffer params = ParseParameters<std::remove_pointer<PFNGLGETNUNIFORMUIVKHRPROC>::type>(
             paramTokens, strings);
         return CallCapture(EntryPoint::GLGetnUniformuivKHR, std::move(params));
-    }
-    if (strcmp(nameToken, "glGetnUniformuivRobustANGLE") == 0)
-    {
-        ParamBuffer params =
-            ParseParameters<std::remove_pointer<PFNGLGETNUNIFORMUIVROBUSTANGLEPROC>::type>(
-                paramTokens, strings);
-        return CallCapture(EntryPoint::GLGetnUniformuivRobustANGLE, std::move(params));
     }
     if (strcmp(nameToken, "glHint") == 0)
     {
@@ -5093,13 +5024,6 @@ CallCapture ParseCallCapture(const Token &nameToken,
             paramTokens, strings);
         return CallCapture(EntryPoint::GLReadnPixelsKHR, std::move(params));
     }
-    if (strcmp(nameToken, "glReadnPixelsRobustANGLE") == 0)
-    {
-        ParamBuffer params =
-            ParseParameters<std::remove_pointer<PFNGLREADNPIXELSROBUSTANGLEPROC>::type>(paramTokens,
-                                                                                        strings);
-        return CallCapture(EntryPoint::GLReadnPixelsRobustANGLE, std::move(params));
-    }
     if (strcmp(nameToken, "glReleaseShaderCompiler") == 0)
     {
         ParamBuffer params =
@@ -5220,13 +5144,6 @@ CallCapture ParseCallCapture(const Token &nameToken,
                                                                                         strings);
         return CallCapture(EntryPoint::GLSamplerParameterIivOES, std::move(params));
     }
-    if (strcmp(nameToken, "glSamplerParameterIivRobustANGLE") == 0)
-    {
-        ParamBuffer params =
-            ParseParameters<std::remove_pointer<PFNGLSAMPLERPARAMETERIIVROBUSTANGLEPROC>::type>(
-                paramTokens, strings);
-        return CallCapture(EntryPoint::GLSamplerParameterIivRobustANGLE, std::move(params));
-    }
     if (strcmp(nameToken, "glSamplerParameterIuiv") == 0)
     {
         ParamBuffer params =
@@ -5247,13 +5164,6 @@ CallCapture ParseCallCapture(const Token &nameToken,
             ParseParameters<std::remove_pointer<PFNGLSAMPLERPARAMETERIUIVOESPROC>::type>(
                 paramTokens, strings);
         return CallCapture(EntryPoint::GLSamplerParameterIuivOES, std::move(params));
-    }
-    if (strcmp(nameToken, "glSamplerParameterIuivRobustANGLE") == 0)
-    {
-        ParamBuffer params =
-            ParseParameters<std::remove_pointer<PFNGLSAMPLERPARAMETERIUIVROBUSTANGLEPROC>::type>(
-                paramTokens, strings);
-        return CallCapture(EntryPoint::GLSamplerParameterIuivRobustANGLE, std::move(params));
     }
     if (strcmp(nameToken, "glSamplerParameterf") == 0)
     {
@@ -5600,13 +5510,6 @@ CallCapture ParseCallCapture(const Token &nameToken,
                                                                                     strings);
         return CallCapture(EntryPoint::GLTexParameterIivOES, std::move(params));
     }
-    if (strcmp(nameToken, "glTexParameterIivRobustANGLE") == 0)
-    {
-        ParamBuffer params =
-            ParseParameters<std::remove_pointer<PFNGLTEXPARAMETERIIVROBUSTANGLEPROC>::type>(
-                paramTokens, strings);
-        return CallCapture(EntryPoint::GLTexParameterIivRobustANGLE, std::move(params));
-    }
     if (strcmp(nameToken, "glTexParameterIuiv") == 0)
     {
         ParamBuffer params = ParseParameters<std::remove_pointer<PFNGLTEXPARAMETERIUIVPROC>::type>(
@@ -5626,13 +5529,6 @@ CallCapture ParseCallCapture(const Token &nameToken,
             ParseParameters<std::remove_pointer<PFNGLTEXPARAMETERIUIVOESPROC>::type>(paramTokens,
                                                                                      strings);
         return CallCapture(EntryPoint::GLTexParameterIuivOES, std::move(params));
-    }
-    if (strcmp(nameToken, "glTexParameterIuivRobustANGLE") == 0)
-    {
-        ParamBuffer params =
-            ParseParameters<std::remove_pointer<PFNGLTEXPARAMETERIUIVROBUSTANGLEPROC>::type>(
-                paramTokens, strings);
-        return CallCapture(EntryPoint::GLTexParameterIuivRobustANGLE, std::move(params));
     }
     if (strcmp(nameToken, "glTexParameterf") == 0)
     {
@@ -6368,6 +6264,12 @@ CallCapture ParseCallCapture(const Token &nameToken,
         ParamBuffer params = ParseParameters<decltype(FenceSync2)>(paramTokens, strings);
         return CallCapture("FenceSync2", std::move(params));
     }
+    if (strcmp(nameToken, "InitializeBinaryDataLoader") == 0)
+    {
+        ParamBuffer params =
+            ParseParameters<decltype(InitializeBinaryDataLoader)>(paramTokens, strings);
+        return CallCapture("InitializeBinaryDataLoader", std::move(params));
+    }
     if (strcmp(nameToken, "InitializeReplay") == 0)
     {
         ParamBuffer params = ParseParameters<decltype(InitializeReplay)>(paramTokens, strings);
@@ -6387,6 +6289,11 @@ CallCapture ParseCallCapture(const Token &nameToken,
     {
         ParamBuffer params = ParseParameters<decltype(InitializeReplay4)>(paramTokens, strings);
         return CallCapture("InitializeReplay4", std::move(params));
+    }
+    if (strcmp(nameToken, "InitializeReplay5") == 0)
+    {
+        ParamBuffer params = ParseParameters<decltype(InitializeReplay5)>(paramTokens, strings);
+        return CallCapture("InitializeReplay5", std::move(params));
     }
     if (strcmp(nameToken, "MapBufferOES") == 0)
     {
@@ -6461,10 +6368,21 @@ CallCapture ParseCallCapture(const Token &nameToken,
             ParseParameters<decltype(UpdateClientBufferDataWithOffset)>(paramTokens, strings);
         return CallCapture("UpdateClientBufferDataWithOffset", std::move(params));
     }
+    if (strcmp(nameToken, "UpdateCurrentContext") == 0)
+    {
+        ParamBuffer params = ParseParameters<decltype(UpdateCurrentContext)>(paramTokens, strings);
+        return CallCapture("UpdateCurrentContext", std::move(params));
+    }
     if (strcmp(nameToken, "UpdateCurrentProgram") == 0)
     {
         ParamBuffer params = ParseParameters<decltype(UpdateCurrentProgram)>(paramTokens, strings);
         return CallCapture("UpdateCurrentProgram", std::move(params));
+    }
+    if (strcmp(nameToken, "UpdateCurrentProgramPerContext") == 0)
+    {
+        ParamBuffer params =
+            ParseParameters<decltype(UpdateCurrentProgramPerContext)>(paramTokens, strings);
+        return CallCapture("UpdateCurrentProgramPerContext", std::move(params));
     }
     if (strcmp(nameToken, "UpdateFenceNVID") == 0)
     {
@@ -6563,6 +6481,12 @@ CallCapture ParseCallCapture(const Token &nameToken,
         UNREACHABLE();
     }
     return CallCapture(nameToken, ParamBuffer());
+}
+
+template <typename Fn, EnableIfNArgs<Fn, 0> = 0>
+void DispatchCallCapture(Fn *fn, const Captures &cap)
+{
+    (*fn)();
 }
 
 template <typename Fn, EnableIfNArgs<Fn, 1> = 0>
@@ -6720,6 +6644,11 @@ void ReplayCustomFunctionCall(const CallCapture &call, const TraceFunctionMap &c
         DispatchCallCapture(FenceSync2, captures);
         return;
     }
+    if (call.customFunctionName == "InitializeBinaryDataLoader")
+    {
+        DispatchCallCapture(InitializeBinaryDataLoader, captures);
+        return;
+    }
     if (call.customFunctionName == "InitializeReplay")
     {
         DispatchCallCapture(InitializeReplay, captures);
@@ -6738,6 +6667,11 @@ void ReplayCustomFunctionCall(const CallCapture &call, const TraceFunctionMap &c
     if (call.customFunctionName == "InitializeReplay4")
     {
         DispatchCallCapture(InitializeReplay4, captures);
+        return;
+    }
+    if (call.customFunctionName == "InitializeReplay5")
+    {
+        DispatchCallCapture(InitializeReplay5, captures);
         return;
     }
     if (call.customFunctionName == "MapBufferOES")
@@ -6810,9 +6744,19 @@ void ReplayCustomFunctionCall(const CallCapture &call, const TraceFunctionMap &c
         DispatchCallCapture(UpdateClientBufferDataWithOffset, captures);
         return;
     }
+    if (call.customFunctionName == "UpdateCurrentContext")
+    {
+        DispatchCallCapture(UpdateCurrentContext, captures);
+        return;
+    }
     if (call.customFunctionName == "UpdateCurrentProgram")
     {
         DispatchCallCapture(UpdateCurrentProgram, captures);
+        return;
+    }
+    if (call.customFunctionName == "UpdateCurrentProgramPerContext")
+    {
+        DispatchCallCapture(UpdateCurrentProgramPerContext, captures);
         return;
     }
     if (call.customFunctionName == "UpdateFenceNVID")

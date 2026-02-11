@@ -4,6 +4,10 @@
 // found in the LICENSE file.
 //
 
+#ifdef UNSAFE_BUFFERS_BUILD
+#    pragma allow_unsafe_buffers
+#endif
+
 #include "test_utils/ANGLETest.h"
 #include "test_utils/gl_raii.h"
 
@@ -1960,6 +1964,40 @@ TEST_P(BufferStorageTestES3, VertexBufferMapped)
     glDeleteProgram(program);
 
     EXPECT_GL_NO_ERROR();
+}
+
+// Verify that glReadPixels works with a persistently mapped buffer.
+TEST_P(BufferStorageTestES3, ReadPixelsPersistentBuffer)
+{
+    ANGLE_SKIP_TEST_IF(!IsGLExtensionEnabled("GL_EXT_buffer_storage"));
+
+    GLBuffer buffer;
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, buffer);
+    glBufferStorageEXT(GL_PIXEL_PACK_BUFFER, 4, nullptr,
+                       GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT_EXT | GL_MAP_COHERENT_BIT_EXT);
+    ASSERT_GL_NO_ERROR();
+
+    void *mapPtr =
+        glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, 4,
+                         GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT_EXT | GL_MAP_COHERENT_BIT_EXT);
+    ASSERT_NE(nullptr, mapPtr);
+    ASSERT_GL_NO_ERROR();
+
+    glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glReadPixels(0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+    ASSERT_GL_NO_ERROR();
+
+    glFinish();
+
+    GLColor actual;
+    memcpy(&actual, mapPtr, sizeof(actual));
+
+    glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+    ASSERT_GL_NO_ERROR();
+
+    EXPECT_EQ(GLColor::green, actual);
 }
 
 void TestPageSharingBuffers(std::function<void(void)> swapCallback,

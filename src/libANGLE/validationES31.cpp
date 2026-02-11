@@ -6,6 +6,10 @@
 
 // validationES31.cpp: Validation functions for OpenGL ES 3.1 entry point parameters
 
+#ifdef UNSAFE_BUFFERS_BUILD
+#    pragma allow_unsafe_buffers
+#endif
+
 #include "libANGLE/validationES31_autogen.h"
 
 #include "libANGLE/Context.h"
@@ -378,22 +382,23 @@ bool ValidateProgramUniformMatrixBase(const Context *context,
     return ValidateUniformMatrixValue(context, entryPoint, valueType, uniform->getType());
 }
 
-bool ValidateVertexAttribFormatCommon(const Context *context,
+bool ValidateVertexAttribFormatCommon(const PrivateState &privateState,
+                                      ErrorSet *errors,
                                       angle::EntryPoint entryPoint,
                                       GLuint relativeOffset)
 {
-    const Caps &caps = context->getCaps();
+    const Caps &caps = privateState.getCaps();
     if (relativeOffset > static_cast<GLuint>(caps.maxVertexAttribRelativeOffset))
     {
-        ANGLE_VALIDATION_ERROR(GL_INVALID_VALUE, kRelativeOffsetTooLarge);
+        errors->validationError(entryPoint, GL_INVALID_VALUE, kRelativeOffsetTooLarge);
         return false;
     }
 
     // [OpenGL ES 3.1] Section 10.3.1 page 243:
     // An INVALID_OPERATION error is generated if the default vertex array object is bound.
-    if (context->getState().getVertexArrayId().value == 0)
+    if (privateState.getVertexArrayId().value == 0)
     {
-        ANGLE_VALIDATION_ERROR(GL_INVALID_OPERATION, kDefaultVertexArray);
+        errors->validationError(entryPoint, GL_INVALID_OPERATION, kDefaultVertexArray);
         return false;
     }
 
@@ -408,47 +413,7 @@ bool ValidateGetBooleani_v(const Context *context,
                            GLuint index,
                            const GLboolean *data)
 {
-    if (!ValidateIndexedStateQuery(context, entryPoint, target, index, nullptr))
-    {
-        return false;
-    }
-
-    return true;
-}
-
-bool ValidateGetBooleani_vRobustANGLE(const Context *context,
-                                      angle::EntryPoint entryPoint,
-                                      GLenum target,
-                                      GLuint index,
-                                      GLsizei bufSize,
-                                      const GLsizei *length,
-                                      const GLboolean *data)
-{
-    if (context->getClientVersion() < ES_3_1)
-    {
-        ANGLE_VALIDATION_ERROR(GL_INVALID_OPERATION, kES31Required);
-        return false;
-    }
-
-    if (!ValidateRobustEntryPoint(context, entryPoint, bufSize))
-    {
-        return false;
-    }
-
-    GLsizei numParams = 0;
-
-    if (!ValidateIndexedStateQuery(context, entryPoint, target, index, &numParams))
-    {
-        return false;
-    }
-
-    if (!ValidateRobustBufferSize(context, entryPoint, bufSize, numParams))
-    {
-        return false;
-    }
-
-    SetRobustLengthParam(length, numParams);
-    return true;
+    return ValidateIndexedStateQuery(context, entryPoint, target, index, data, nullptr);
 }
 
 bool ValidateDrawIndirectBase(const Context *context,
@@ -472,7 +437,7 @@ bool ValidateDrawIndirectBase(const Context *context,
         return false;
     }
 
-    if (context->getStateCache().hasAnyActiveClientAttrib())
+    if (context->hasAnyActiveClientAttrib())
     {
         ANGLE_VALIDATION_ERROR(GL_INVALID_OPERATION, kClientDataInVertexArray);
         return false;
@@ -509,16 +474,7 @@ bool ValidateDrawArraysIndirect(const Context *context,
     {
         // EXT_geometry_shader allows transform feedback to work with all draw commands.
         // [EXT_geometry_shader] Section 12.1, "Transform Feedback"
-        if (context->getExtensions().geometryShaderAny() || context->getClientVersion() >= ES_3_2)
-        {
-            if (!ValidateTransformFeedbackPrimitiveMode(
-                    context, entryPoint, curTransformFeedback->getPrimitiveMode(), mode))
-            {
-                ANGLE_VALIDATION_ERROR(GL_INVALID_OPERATION, kInvalidDrawModeTransformFeedback);
-                return false;
-            }
-        }
-        else
+        if (!context->getExtensions().geometryShaderAny() && context->getClientVersion() < ES_3_2)
         {
             // An INVALID_OPERATION error is generated if transform feedback is active and not
             // paused.
@@ -1102,18 +1058,6 @@ bool ValidateGetFramebufferParameteriv(const Context *context,
     return ValidateGetFramebufferParameterivBase(context, entryPoint, target, pname, params);
 }
 
-bool ValidateGetFramebufferParameterivRobustANGLE(const Context *context,
-                                                  angle::EntryPoint entryPoint,
-                                                  GLenum target,
-                                                  GLenum pname,
-                                                  GLsizei bufSize,
-                                                  const GLsizei *length,
-                                                  const GLint *params)
-{
-    UNIMPLEMENTED();
-    return false;
-}
-
 bool ValidateGetProgramResourceIndex(const Context *context,
                                      angle::EntryPoint entryPoint,
                                      ShaderProgramID program,
@@ -1179,30 +1123,33 @@ bool ValidateBindVertexBuffer(const Context *context,
     return true;
 }
 
-bool ValidateVertexBindingDivisor(const Context *context,
+bool ValidateVertexBindingDivisor(const PrivateState &privateState,
+                                  ErrorSet *errors,
                                   angle::EntryPoint entryPoint,
                                   GLuint bindingIndex,
                                   GLuint divisor)
 {
-    const Caps &caps = context->getCaps();
+    const Caps &caps = privateState.getCaps();
     if (bindingIndex >= static_cast<GLuint>(caps.maxVertexAttribBindings))
     {
-        ANGLE_VALIDATION_ERROR(GL_INVALID_VALUE, kExceedsMaxVertexAttribBindings);
+        errors->validationError(entryPoint, GL_INVALID_VALUE, kExceedsMaxVertexAttribBindings);
         return false;
     }
 
     // [OpenGL ES 3.1] Section 10.3.1 page 243:
     // An INVALID_OPERATION error is generated if the default vertex array object is bound.
-    if (context->getState().getVertexArrayId().value == 0)
+    if (privateState.getVertexArrayId().value == 0)
     {
-        ANGLE_VALIDATION_ERROR(GL_INVALID_OPERATION, kDefaultVertexArray);
+        errors->validationError(entryPoint, GL_INVALID_OPERATION, kDefaultVertexArray);
         return false;
     }
 
     return true;
 }
 
-bool ValidateVertexAttribFormat(const Context *context,
+bool ValidateVertexAttribFormat(const PrivateState &privateState,
+                                const PrivateStateCache &privateStateCache,
+                                ErrorSet *errors,
                                 angle::EntryPoint entryPoint,
                                 GLuint attribindex,
                                 GLint size,
@@ -1210,52 +1157,57 @@ bool ValidateVertexAttribFormat(const Context *context,
                                 GLboolean normalized,
                                 GLuint relativeoffset)
 {
-    if (!ValidateVertexAttribFormatCommon(context, entryPoint, relativeoffset))
+    if (!ValidateVertexAttribFormatCommon(privateState, errors, entryPoint, relativeoffset))
     {
         return false;
     }
 
-    return ValidateFloatVertexFormat(context, entryPoint, attribindex, size, type);
+    return ValidateFloatVertexFormat(privateState, privateStateCache, errors, entryPoint,
+                                     attribindex, size, type);
 }
 
-bool ValidateVertexAttribIFormat(const Context *context,
+bool ValidateVertexAttribIFormat(const PrivateState &privateState,
+                                 const PrivateStateCache &privateStateCache,
+                                 ErrorSet *errors,
                                  angle::EntryPoint entryPoint,
                                  GLuint attribindex,
                                  GLint size,
                                  VertexAttribType type,
                                  GLuint relativeoffset)
 {
-    if (!ValidateVertexAttribFormatCommon(context, entryPoint, relativeoffset))
+    if (!ValidateVertexAttribFormatCommon(privateState, errors, entryPoint, relativeoffset))
     {
         return false;
     }
 
-    return ValidateIntegerVertexFormat(context, entryPoint, attribindex, size, type);
+    return ValidateIntegerVertexFormat(privateState, privateStateCache, errors, entryPoint,
+                                       attribindex, size, type);
 }
 
-bool ValidateVertexAttribBinding(const Context *context,
+bool ValidateVertexAttribBinding(const PrivateState &privateState,
+                                 ErrorSet *errors,
                                  angle::EntryPoint entryPoint,
                                  GLuint attribIndex,
                                  GLuint bindingIndex)
 {
     // [OpenGL ES 3.1] Section 10.3.1 page 243:
     // An INVALID_OPERATION error is generated if the default vertex array object is bound.
-    if (context->getState().getVertexArrayId().value == 0)
+    if (privateState.getVertexArrayId().value == 0)
     {
-        ANGLE_VALIDATION_ERROR(GL_INVALID_OPERATION, kDefaultVertexArray);
+        errors->validationError(entryPoint, GL_INVALID_OPERATION, kDefaultVertexArray);
         return false;
     }
 
-    const Caps &caps = context->getCaps();
+    const Caps &caps = privateState.getCaps();
     if (attribIndex >= static_cast<GLuint>(caps.maxVertexAttributes))
     {
-        ANGLE_VALIDATION_ERROR(GL_INVALID_VALUE, kIndexExceedsMaxVertexAttribute);
+        errors->validationError(entryPoint, GL_INVALID_VALUE, kIndexExceedsMaxVertexAttribute);
         return false;
     }
 
     if (bindingIndex >= static_cast<GLuint>(caps.maxVertexAttribBindings))
     {
-        ANGLE_VALIDATION_ERROR(GL_INVALID_VALUE, kExceedsMaxVertexAttribBindings);
+        errors->validationError(entryPoint, GL_INVALID_VALUE, kExceedsMaxVertexAttribBindings);
         return false;
     }
 
@@ -1500,7 +1452,7 @@ bool ValidateGetProgramResourceiv(const Context *context,
                                   GLuint index,
                                   GLsizei propCount,
                                   const GLenum *props,
-                                  GLsizei bufSize,
+                                  GLsizei count,
                                   const GLsizei *length,
                                   const GLint *params)
 {
@@ -1521,9 +1473,9 @@ bool ValidateGetProgramResourceiv(const Context *context,
         ANGLE_VALIDATION_ERROR(GL_INVALID_VALUE, kInvalidPropCount);
         return false;
     }
-    if (bufSize < 0)
+    if (count < 0)
     {
-        ANGLE_VALIDATION_ERROR(GL_INVALID_VALUE, kNegativeBufSize);
+        ANGLE_VALIDATION_ERROR(GL_INVALID_VALUE, kNegativeCount);
         return false;
     }
     if (!ValidateProgramResourceIndex(programObject, programInterface, index))
@@ -1603,25 +1555,13 @@ bool ValidateGetProgramInterfaceiv(const Context *context,
     return true;
 }
 
-bool ValidateGetProgramInterfaceivRobustANGLE(const Context *context,
-                                              angle::EntryPoint entryPoint,
-                                              ShaderProgramID program,
-                                              GLenum programInterface,
-                                              GLenum pname,
-                                              GLsizei bufSize,
-                                              const GLsizei *length,
-                                              const GLint *params)
-{
-    UNIMPLEMENTED();
-    return false;
-}
-
 bool ValidateGenProgramPipelinesBase(const Context *context,
                                      angle::EntryPoint entryPoint,
                                      GLsizei n,
                                      const ProgramPipelineID *pipelines)
 {
-    return ValidateGenOrDelete(context, entryPoint, n, pipelines);
+    return ValidateGenOrDelete(context->getMutableErrorSetForValidation(), entryPoint, n,
+                               pipelines);
 }
 
 bool ValidateDeleteProgramPipelinesBase(const Context *context,
@@ -1629,7 +1569,8 @@ bool ValidateDeleteProgramPipelinesBase(const Context *context,
                                         GLsizei n,
                                         const ProgramPipelineID *pipelines)
 {
-    return ValidateGenOrDelete(context, entryPoint, n, pipelines);
+    return ValidateGenOrDelete(context->getMutableErrorSetForValidation(), entryPoint, n,
+                               pipelines);
 }
 
 bool ValidateBindProgramPipelineBase(const Context *context,

@@ -7,6 +7,10 @@
 //   Implementation of common ANGLE testing fixture.
 //
 
+#ifdef UNSAFE_BUFFERS_BUILD
+#    pragma allow_unsafe_buffers
+#endif
+
 #include "ANGLETest.h"
 
 #include <algorithm>
@@ -593,7 +597,7 @@ void ANGLETestBase::initOSWindow()
             FATAL() << "Failed to create a new window";
         }
         mFixture->osWindow->disableErrorMessageDialog();
-        if (!mFixture->osWindow->initialize(windowName.c_str(), 128, 128))
+        if (!mFixture->osWindow->initialize(windowName, 128, 128))
         {
             std::cerr << "Failed to initialize OS Window.\n";
         }
@@ -1610,6 +1614,11 @@ void ANGLETestBase::setConfigDepthBits(int bits)
 void ANGLETestBase::setConfigStencilBits(int bits)
 {
     mFixture->configParams.stencilBits = bits;
+}
+
+void ANGLETestBase::setConfigColorSpace(EGLenum colorSpace)
+{
+    mFixture->configParams.colorSpace = colorSpace;
 }
 
 void ANGLETestBase::setConfigComponentType(EGLenum componentType)

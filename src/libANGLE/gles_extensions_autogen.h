@@ -344,6 +344,9 @@ struct Extensions
     // GL_OVR_multiview2
     bool multiview2OVR = false;
 
+    // GL_OVR_multiview_multisampled_render_to_texture
+    bool multiviewMultisampledRenderToTextureOVR = false;
+
     // GL_KHR_no_error
     bool noErrorKHR = false;
 
@@ -475,6 +478,9 @@ struct Extensions
 
     // GL_EXT_shader_texture_lod
     bool shaderTextureLodEXT = false;
+
+    // GL_EXT_shader_texture_samples
+    bool shaderTextureSamplesEXT = false;
 
     // GL_QCOM_shading_rate
     bool shadingRateQCOM = false;
@@ -628,6 +634,9 @@ struct Extensions
 
     // GL_EXT_texture_type_2_10_10_10_REV
     bool textureType2101010REVEXT = false;
+
+    // GL_ARM_texture_unnormalized_coordinates
+    bool textureUnnormalizedCoordinatesARM = false;
 
     // GL_ANGLE_texture_usage
     bool textureUsageANGLE = false;

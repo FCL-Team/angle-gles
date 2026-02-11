@@ -15,6 +15,7 @@
 #include "image_util/loadimage.h"
 #include "libANGLE/renderer/ContextImpl.h"
 #include "libANGLE/renderer/wgpu/DisplayWgpu.h"
+#include "libANGLE/renderer/wgpu/UtilsWgpu.h"
 #include "libANGLE/renderer/wgpu/wgpu_command_buffer.h"
 #include "libANGLE/renderer/wgpu/wgpu_format_utils.h"
 #include "libANGLE/renderer/wgpu/wgpu_helpers.h"
@@ -254,7 +255,8 @@ class ContextWgpu : public ContextImpl
     BufferImpl *createBuffer(const gl::BufferState &state) override;
 
     // Vertex Array creation
-    VertexArrayImpl *createVertexArray(const gl::VertexArrayState &data) override;
+    VertexArrayImpl *createVertexArray(const gl::VertexArrayState &data,
+                                       const gl::VertexArrayBuffers &vertexArrayBuffers) override;
 
     // Query and Fence creation
     QueryImpl *createQuery(gl::QueryType type) override;
@@ -329,7 +331,8 @@ class ContextWgpu : public ContextImpl
     void invalidateDriverUniforms();
 
     void ensureCommandEncoderCreated();
-    webgpu::CommandEncoderHandle &getCurrentCommandEncoder();
+    angle::Result getCurrentCommandEncoder(webgpu::RenderPassClosureReason closureReason,
+                                           webgpu::CommandEncoderHandle *outHandle);
 
     // Driver uniforms are managed by ContextWgpu.
     webgpu::BindGroupLayoutHandle getDriverUniformBindGroupLayout()
@@ -337,6 +340,9 @@ class ContextWgpu : public ContextImpl
         ASSERT(mDriverUniformsBindGroupLayout);
         return mDriverUniformsBindGroupLayout;
     }
+
+    webgpu::UtilsWgpu *getUtils() { return &mUtils; }
+    webgpu::CommandBuffer &getCommandBuffer() { return mCommandBuffer; }
 
   private:
     // Dirty bits.
@@ -350,6 +356,7 @@ class ContextWgpu : public ContextImpl
         DIRTY_BIT_RENDER_PIPELINE_BINDING,
         DIRTY_BIT_VIEWPORT,
         DIRTY_BIT_SCISSOR,
+        DIRTY_BIT_STENCIL_REF,
         DIRTY_BIT_BLEND_CONSTANT,
 
         DIRTY_BIT_VERTEX_BUFFERS,
@@ -399,6 +406,7 @@ class ContextWgpu : public ContextImpl
     angle::Result handleDirtyRenderPipelineBinding(DirtyBits::Iterator *dirtyBitsIterator);
     angle::Result handleDirtyViewport(DirtyBits::Iterator *dirtyBitsIterator);
     angle::Result handleDirtyScissor(DirtyBits::Iterator *dirtyBitsIterator);
+    angle::Result handleDirtyStencilRef(DirtyBits::Iterator *dirtyBitsIterator);
     angle::Result handleDirtyBlendConstant(DirtyBits::Iterator *dirtyBitsIterator);
     angle::Result handleDirtyVertexBuffers(const gl::AttributesMask &slots,
                                            DirtyBits::Iterator *dirtyBitsIterator);
@@ -432,6 +440,8 @@ class ContextWgpu : public ContextImpl
     // Holds the most recent driver uniforms BindGroup. Note there may be others in the
     // command buffer.
     webgpu::BindGroupHandle mDriverUniformsBindGroup;
+
+    webgpu::UtilsWgpu mUtils;
 };
 
 }  // namespace rx

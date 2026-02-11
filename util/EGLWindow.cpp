@@ -4,6 +4,10 @@
 // found in the LICENSE file.
 //
 
+#ifdef UNSAFE_BUFFERS_BUILD
+#    pragma allow_unsafe_buffers
+#endif
+
 #include "util/EGLWindow.h"
 
 #include <cassert>
@@ -849,6 +853,16 @@ EGLint EGLWindow::getEGLError()
 EGLWindow::Display EGLWindow::getCurrentDisplay()
 {
     return eglGetCurrentDisplay();
+}
+
+EGLWindow::Surface EGLWindow::getCurrentSurface(EGLint readdraw)
+{
+    return eglGetCurrentSurface(readdraw);
+}
+
+EGLContext EGLWindow::getCurrentContext()
+{
+    return eglGetCurrentContext();
 }
 
 GLWindowBase::Surface EGLWindow::createPbufferSurface(const EGLint *attrib_list)

@@ -12,6 +12,7 @@
 #include "compiler/translator/glsl/BuiltInFunctionEmulatorGLSL.h"
 #include "compiler/translator/glsl/OutputESSL.h"
 #include "compiler/translator/tree_ops/DeclarePerVertexBlocks.h"
+#include "compiler/translator/tree_ops/MonomorphizeUnsupportedFunctions.h"
 #include "compiler/translator/tree_ops/RecordConstantPrecision.h"
 #include "compiler/translator/tree_util/FindSymbolNode.h"
 #include "compiler/translator/tree_util/ReplaceClipCullDistanceVariable.h"
@@ -75,20 +76,18 @@ bool TranslatorESSL::translate(TIntermBlock *root,
         // Although ANGLE supports all these extensions with ESSL 3.00,
         // some drivers may support the required functionality only
         // with ESSL 3.10.
+        //
+        // When PLS is implemented with shader images, ESSL 3.10 output is required.
         const bool hasExtensionsThatMayRequireES31 =
             getResources().EXT_clip_cull_distance || getResources().ANGLE_clip_cull_distance ||
             getResources().NV_shader_noperspective_interpolation ||
             getResources().OES_shader_multisample_interpolation ||
             getResources().ANGLE_texture_multisample ||
-            getResources().OES_texture_storage_multisample_2d_array;
+            getResources().OES_texture_storage_multisample_2d_array ||
+            (getResources().ANGLE_shader_pixel_local_storage &&
+             compileOptions.pls.type == ShPixelLocalStorageType::ImageLoadStore);
 
-        // When PLS is implemented with shader images,
-        // ESSL 3.10 output is required.
-        const bool usesShaderImagesForPLS =
-            hasPixelLocalStorageUniforms() &&
-            compileOptions.pls.type == ShPixelLocalStorageType::ImageLoadStore;
-
-        if (hasExtensionsThatMayRequireES31 || usesShaderImagesForPLS)
+        if (hasExtensionsThatMayRequireES31)
         {
             shaderVer = 310;
         }
@@ -108,6 +107,18 @@ bool TranslatorESSL::translate(TIntermBlock *root,
     if (!RecordConstantPrecision(this, root, &getSymbolTable()))
     {
         return false;
+    }
+
+    if (!compileOptions.useIR)
+    {
+        // anglebug.com/42265954: The ESSL spec has a bug with images as function arguments. The
+        // recommended workaround is to inline functions that accept image arguments.
+        if (shaderVer >= 310 && !MonomorphizeUnsupportedFunctions(
+                                    this, root, &getSymbolTable(),
+                                    UnsupportedFunctionArgsBitSet{UnsupportedFunctionArgs::Image}))
+        {
+            return false;
+        }
     }
 
     // Write emulated built-in functions if needed.
@@ -239,13 +250,7 @@ void TranslatorESSL::writeExtensionBehavior(const ShCompileOptions &compileOptio
         {
             const bool isMultiview = (iter->first == TExtension::OVR_multiview) ||
                                      (iter->first == TExtension::OVR_multiview2);
-            if (getResources().NV_shader_framebuffer_fetch &&
-                iter->first == TExtension::EXT_shader_framebuffer_fetch)
-            {
-                sink << "#extension GL_NV_shader_framebuffer_fetch : "
-                     << GetBehaviorString(iter->second) << "\n";
-            }
-            else if (getResources().NV_draw_buffers && iter->first == TExtension::EXT_draw_buffers)
+            if (getResources().NV_draw_buffers && iter->first == TExtension::EXT_draw_buffers)
             {
                 sink << "#extension GL_NV_draw_buffers : " << GetBehaviorString(iter->second)
                      << "\n";
