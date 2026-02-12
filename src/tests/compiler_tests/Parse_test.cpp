@@ -21,7 +21,6 @@ class ParseTest : public testing::Test
     ParseTest()
     {
         InitBuiltInResources(&mResources);
-        mResources.FragmentPrecisionHigh = 1;
         mCompileOptions.intermediateTree = true;
     }
 
@@ -42,7 +41,7 @@ class ParseTest : public testing::Test
         }
 
         const char *shaderStrings[] = {shaderString.c_str()};
-        bool compilationSuccess     = mTranslator->compile(shaderStrings, 1, mCompileOptions);
+        bool compilationSuccess     = mTranslator->compile(shaderStrings, mCompileOptions);
         mInfoLog                    = mTranslator->getInfoSink().info.str();
         if (!compilationSuccess)
         {
@@ -240,21 +239,6 @@ void main() {
     EXPECT_FALSE(compile(kShader));
     EXPECT_TRUE(foundErrorInIntermediateTree());
     EXPECT_TRUE(foundInIntermediateTree("coherent specified multiple times"));
-}
-
-TEST_F(ParseTest, LargeArrayIndexNoCrash)
-{
-    mShaderSpec          = SH_WEBGL2_SPEC;
-    const char kShader[] = R"(#version 300 es
-int rr[~1U];
-out int o;
-void main() {
-    o = rr[1];
-})";
-    EXPECT_FALSE(compile(kShader));
-    EXPECT_TRUE(foundErrorInIntermediateTree());
-    EXPECT_TRUE(
-        foundInIntermediateTree("Size of declared variable exceeds implementation-defined limit"));
 }
 
 // Tests that separating variable declaration of multiple instances of a anonymous structure
@@ -897,7 +881,7 @@ void f(out float r, out float)
 0:4:     Function Prototype: 'main' (symbol id 3004) (void)
 0:5:     Code block
 0:6:       move second child to first child (mediump 4-component vector of float)
-0:6:         gl_FragColor (symbol id 1913) (FragColor mediump 4-component vector of float)
+0:6:         gl_FragColor (symbol id 1917) (FragColor mediump 4-component vector of float)
 0:6:         Constant union (const mediump 4-component vector of float)
 0:6:           0.5 (const float)
 0:6:           0.5 (const float)
@@ -905,9 +889,9 @@ void f(out float r, out float)
 0:6:           0.5 (const float)
 0:7:       Call a function: 'f' (symbol id 3001) (void)
 0:7:         vector swizzle (x) (mediump float)
-0:7:           gl_FragColor (symbol id 1913) (FragColor mediump 4-component vector of float)
+0:7:           gl_FragColor (symbol id 1917) (FragColor mediump 4-component vector of float)
 0:7:         vector swizzle (y) (mediump float)
-0:7:           gl_FragColor (symbol id 1913) (FragColor mediump 4-component vector of float)
+0:7:           gl_FragColor (symbol id 1917) (FragColor mediump 4-component vector of float)
 0:9:   Function Definition:
 0:9:     Function Prototype: 'f' (symbol id 3001) (void)
 0:9:       parameter: 'r' (symbol id 3006) (out highp float)

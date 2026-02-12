@@ -88,12 +88,14 @@ void QuerySamplerParameterIuiv(const Sampler *sampler, GLenum pname, GLuint *par
 // functions.
 void QueryVertexAttribfv(const VertexAttribute &attrib,
                          const VertexBinding &binding,
+                         const Buffer *buffer,
                          const VertexAttribCurrentValueData &currentValueData,
                          GLenum pname,
                          GLfloat *params);
 
 void QueryVertexAttribiv(const VertexAttribute &attrib,
                          const VertexBinding &binding,
+                         const Buffer *buffer,
                          const VertexAttribCurrentValueData &currentValueData,
                          GLenum pname,
                          GLint *params);
@@ -102,12 +104,14 @@ void QueryVertexAttribPointerv(const VertexAttribute &attrib, GLenum pname, void
 
 void QueryVertexAttribIiv(const VertexAttribute &attrib,
                           const VertexBinding &binding,
+                          const Buffer *buffer,
                           const VertexAttribCurrentValueData &currentValueData,
                           GLenum pname,
                           GLint *params);
 
 void QueryVertexAttribIuiv(const VertexAttribute &attrib,
                            const VertexBinding &binding,
+                           const Buffer *buffer,
                            const VertexAttribCurrentValueData &currentValueData,
                            GLenum pname,
                            GLuint *params);
@@ -122,7 +126,7 @@ void QueryInternalFormativ(const Context *context,
                            GLenum internalformat,
                            const TextureCaps &format,
                            GLenum pname,
-                           GLsizei bufSize,
+                           GLsizei count,
                            GLint *params);
 
 void QueryFramebufferParameteriv(const Framebuffer *framebuffer, GLenum pname, GLint *params);
@@ -141,7 +145,7 @@ void QueryFramebufferPixelLocalStorageParameteriv(Context *context,
 angle::Result QuerySynciv(const Context *context,
                           const Sync *sync,
                           GLenum pname,
-                          GLsizei bufSize,
+                          GLsizei count,
                           GLsizei *length,
                           GLint *values);
 
@@ -193,7 +197,7 @@ void QueryProgramResourceiv(const Program *program,
                             UniformBlockIndex index,
                             GLsizei propCount,
                             const GLenum *props,
-                            GLsizei bufSize,
+                            GLsizei count,
                             GLsizei *length,
                             GLint *params);
 

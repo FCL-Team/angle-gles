@@ -6,6 +6,10 @@
 
 // queryutils.cpp: Utilities for querying values from GL objects
 
+#ifdef UNSAFE_BUFFERS_BUILD
+#    pragma allow_unsafe_buffers
+#endif
+
 #include "libANGLE/queryutils.h"
 
 #include <algorithm>
@@ -633,6 +637,7 @@ void SetSamplerParameterBase(Context *context,
 template <typename ParamType, typename CurrentDataType, size_t CurrentValueCount>
 void QueryVertexAttribBase(const VertexAttribute &attrib,
                            const VertexBinding &binding,
+                           const Buffer *buffer,
                            const CurrentDataType (&currentValueData)[CurrentValueCount],
                            GLenum pname,
                            ParamType *params)
@@ -663,7 +668,7 @@ void QueryVertexAttribBase(const VertexAttribute &attrib,
                 CastFromStateValue<ParamType>(pname, static_cast<GLint>(attrib.format->isNorm()));
             break;
         case GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING:
-            *params = CastFromGLintStateValue<ParamType>(pname, binding.getBuffer().id().value);
+            *params = CastFromGLintStateValue<ParamType>(pname, buffer ? buffer->id().value : 0);
             break;
         case GL_VERTEX_ATTRIB_ARRAY_DIVISOR:
             *params = CastFromStateValue<ParamType>(pname, binding.getDivisor());
@@ -1048,7 +1053,7 @@ template <typename ShaderVariableT>
 void GetShaderVariableBufferResourceProperty(const ShaderVariableT &buffer,
                                              GLenum pname,
                                              GLint *params,
-                                             GLsizei bufSize,
+                                             GLsizei count,
                                              GLsizei *outputPosition)
 
 {
@@ -1062,7 +1067,7 @@ void GetShaderVariableBufferResourceProperty(const ShaderVariableT &buffer,
             break;
         case GL_ACTIVE_VARIABLES:
             for (size_t memberIndex = 0;
-                 memberIndex < buffer.memberIndexes.size() && *outputPosition < bufSize;
+                 memberIndex < buffer.memberIndexes.size() && *outputPosition < count;
                  ++memberIndex)
             {
                 params[(*outputPosition)++] = clampCast<GLint>(buffer.memberIndexes[memberIndex]);
@@ -1097,7 +1102,7 @@ void GetShaderVariableBufferResourceProperty(const ShaderVariableT &buffer,
 void GetInterfaceBlockResourceProperty(const InterfaceBlock &block,
                                        GLenum pname,
                                        GLint *params,
-                                       GLsizei bufSize,
+                                       GLsizei count,
                                        GLsizei *outputPosition)
 {
     if (pname == GL_NAME_LENGTH)
@@ -1105,18 +1110,18 @@ void GetInterfaceBlockResourceProperty(const InterfaceBlock &block,
         params[(*outputPosition)++] = clampCast<GLint>(block.nameWithArrayIndex().size() + 1);
         return;
     }
-    GetShaderVariableBufferResourceProperty(block, pname, params, bufSize, outputPosition);
+    GetShaderVariableBufferResourceProperty(block, pname, params, count, outputPosition);
 }
 
 void GetUniformBlockResourceProperty(const Program *program,
                                      GLuint blockIndex,
                                      GLenum pname,
                                      GLint *params,
-                                     GLsizei bufSize,
+                                     GLsizei count,
                                      GLsizei *outputPosition)
 
 {
-    ASSERT(*outputPosition < bufSize);
+    ASSERT(*outputPosition < count);
 
     if (pname == GL_BUFFER_BINDING)
     {
@@ -1125,18 +1130,18 @@ void GetUniformBlockResourceProperty(const Program *program,
     }
 
     const auto &block = program->getExecutable().getUniformBlockByIndex(blockIndex);
-    GetInterfaceBlockResourceProperty(block, pname, params, bufSize, outputPosition);
+    GetInterfaceBlockResourceProperty(block, pname, params, count, outputPosition);
 }
 
 void GetShaderStorageBlockResourceProperty(const Program *program,
                                            GLuint blockIndex,
                                            GLenum pname,
                                            GLint *params,
-                                           GLsizei bufSize,
+                                           GLsizei count,
                                            GLsizei *outputPosition)
 
 {
-    ASSERT(*outputPosition < bufSize);
+    ASSERT(*outputPosition < count);
 
     if (pname == GL_BUFFER_BINDING)
     {
@@ -1146,18 +1151,18 @@ void GetShaderStorageBlockResourceProperty(const Program *program,
     }
 
     const auto &block = program->getExecutable().getShaderStorageBlockByIndex(blockIndex);
-    GetInterfaceBlockResourceProperty(block, pname, params, bufSize, outputPosition);
+    GetInterfaceBlockResourceProperty(block, pname, params, count, outputPosition);
 }
 
 void GetAtomicCounterBufferResourceProperty(const Program *program,
                                             GLuint index,
                                             GLenum pname,
                                             GLint *params,
-                                            GLsizei bufSize,
+                                            GLsizei count,
                                             GLsizei *outputPosition)
 
 {
-    ASSERT(*outputPosition < bufSize);
+    ASSERT(*outputPosition < count);
 
     if (pname == GL_BUFFER_BINDING)
     {
@@ -1166,7 +1171,7 @@ void GetAtomicCounterBufferResourceProperty(const Program *program,
     }
 
     const auto &buffer = program->getExecutable().getAtomicCounterBuffers()[index];
-    GetShaderVariableBufferResourceProperty(buffer, pname, params, bufSize, outputPosition);
+    GetShaderVariableBufferResourceProperty(buffer, pname, params, count, outputPosition);
 }
 
 bool IsTextureEnvEnumParameter(TextureEnvParameter pname)
@@ -1686,20 +1691,24 @@ void QuerySamplerParameterIuiv(const Sampler *sampler, GLenum pname, GLuint *par
 
 void QueryVertexAttribfv(const VertexAttribute &attrib,
                          const VertexBinding &binding,
+                         const Buffer *buffer,
                          const VertexAttribCurrentValueData &currentValueData,
                          GLenum pname,
                          GLfloat *params)
 {
-    QueryVertexAttribBase(attrib, binding, currentValueData.Values.FloatValues, pname, params);
+    QueryVertexAttribBase(attrib, binding, buffer, currentValueData.Values.FloatValues, pname,
+                          params);
 }
 
 void QueryVertexAttribiv(const VertexAttribute &attrib,
                          const VertexBinding &binding,
+                         const Buffer *buffer,
                          const VertexAttribCurrentValueData &currentValueData,
                          GLenum pname,
                          GLint *params)
 {
-    QueryVertexAttribBase(attrib, binding, currentValueData.Values.FloatValues, pname, params);
+    QueryVertexAttribBase(attrib, binding, buffer, currentValueData.Values.FloatValues, pname,
+                          params);
 }
 
 void QueryVertexAttribPointerv(const VertexAttribute &attrib, GLenum pname, void **pointer)
@@ -1718,20 +1727,23 @@ void QueryVertexAttribPointerv(const VertexAttribute &attrib, GLenum pname, void
 
 void QueryVertexAttribIiv(const VertexAttribute &attrib,
                           const VertexBinding &binding,
+                          const Buffer *buffer,
                           const VertexAttribCurrentValueData &currentValueData,
                           GLenum pname,
                           GLint *params)
 {
-    QueryVertexAttribBase(attrib, binding, currentValueData.Values.IntValues, pname, params);
+    QueryVertexAttribBase(attrib, binding, buffer, currentValueData.Values.IntValues, pname,
+                          params);
 }
 
 void QueryVertexAttribIuiv(const VertexAttribute &attrib,
                            const VertexBinding &binding,
+                           const Buffer *buffer,
                            const VertexAttribCurrentValueData &currentValueData,
                            GLenum pname,
                            GLuint *params)
 {
-    QueryVertexAttribBase(attrib, binding, currentValueData.Values.UnsignedIntValues, pname,
+    QueryVertexAttribBase(attrib, binding, buffer, currentValueData.Values.UnsignedIntValues, pname,
                           params);
 }
 
@@ -1750,22 +1762,25 @@ void QueryInternalFormativ(const Context *context,
                            GLenum internalformat,
                            const TextureCaps &format,
                            GLenum pname,
-                           GLsizei bufSize,
+                           GLsizei count,
                            GLint *params)
 {
+    if (count < 1)
+    {
+        return;
+    }
+
     switch (pname)
     {
         case GL_NUM_SAMPLE_COUNTS:
-            if (bufSize != 0)
-            {
-                *params = clampCast<GLint>(format.sampleCounts.size());
-            }
+            *params = clampCast<GLint>(format.sampleCounts.size());
             break;
 
         case GL_SAMPLES:
         {
-            size_t returnCount   = std::min<size_t>(bufSize, format.sampleCounts.size());
-            auto sampleReverseIt = format.sampleCounts.rbegin();
+            size_t returnCount   = std::min<size_t>(count, format.sampleCounts.size());
+            auto sampleCounts    = format.sampleCounts.sampleCounts();
+            auto sampleReverseIt = sampleCounts.rbegin();
             for (size_t sampleIndex = 0; sampleIndex < returnCount; ++sampleIndex)
             {
                 params[sampleIndex] = *sampleReverseIt++;
@@ -1777,15 +1792,14 @@ void QueryInternalFormativ(const Context *context,
             if (texture != nullptr)
             {
                 *params = texture->getFormatSupportedCompressionRates(context, internalformat,
-                                                                      bufSize, nullptr);
+                                                                      count, nullptr);
             }
             break;
 
         case GL_SURFACE_COMPRESSION_EXT:
             if (texture != nullptr)
             {
-                texture->getFormatSupportedCompressionRates(context, internalformat, bufSize,
-                                                            params);
+                texture->getFormatSupportedCompressionRates(context, internalformat, count, params);
             }
             break;
 
@@ -1923,14 +1937,14 @@ void QueryFramebufferPixelLocalStorageParameteriv(Context *context,
 angle::Result QuerySynciv(const Context *context,
                           const Sync *sync,
                           GLenum pname,
-                          GLsizei bufSize,
+                          GLsizei count,
                           GLsizei *length,
                           GLint *values)
 {
     ASSERT(sync != nullptr || pname == GL_SYNC_STATUS);
 
-    // All queries return one value, exit early if the buffer can't fit anything.
-    if (bufSize < 1)
+    // All queries return one value, exit early if the requested count is less.
+    if (count < 1)
     {
         if (length != nullptr)
         {
@@ -2323,7 +2337,7 @@ void QueryProgramResourceiv(const Program *program,
                             UniformBlockIndex index,
                             GLsizei propCount,
                             const GLenum *props,
-                            GLsizei bufSize,
+                            GLsizei count,
                             GLsizei *length,
                             GLint *params)
 {
@@ -2337,9 +2351,8 @@ void QueryProgramResourceiv(const Program *program,
         *length = 0;
     }
 
-    if (bufSize == 0)
+    if (count < 1)
     {
-        // No room to write the results
         return;
     }
 
@@ -2369,18 +2382,18 @@ void QueryProgramResourceiv(const Program *program,
                 break;
 
             case GL_UNIFORM_BLOCK:
-                GetUniformBlockResourceProperty(program, index.value, props[i], params, bufSize,
+                GetUniformBlockResourceProperty(program, index.value, props[i], params, count,
                                                 &pos);
                 break;
 
             case GL_SHADER_STORAGE_BLOCK:
-                GetShaderStorageBlockResourceProperty(program, index.value, props[i], params,
-                                                      bufSize, &pos);
+                GetShaderStorageBlockResourceProperty(program, index.value, props[i], params, count,
+                                                      &pos);
                 break;
 
             case GL_ATOMIC_COUNTER_BUFFER:
                 GetAtomicCounterBufferResourceProperty(program, index.value, props[i], params,
-                                                       bufSize, &pos);
+                                                       count, &pos);
                 break;
 
             case GL_TRANSFORM_FEEDBACK_VARYING:
@@ -2393,7 +2406,7 @@ void QueryProgramResourceiv(const Program *program,
                 UNREACHABLE();
                 params[i] = GL_INVALID_VALUE;
         }
-        if (pos == bufSize)
+        if (pos == count)
         {
             // Most properties return one value, but GL_ACTIVE_VARIABLES returns an array of values.
             // This checks not to break buffer bounds for such case.
@@ -3667,6 +3680,22 @@ bool GetQueryParameterInfo(const State &glState,
             *type      = GL_INT;
             *numParams = 1;
             return true;
+        case GL_SHADING_RATE_EXT:
+            if (!extensions.fragmentShadingRateEXT)
+            {
+                return false;
+            }
+            *type      = GL_INT;
+            *numParams = 1;
+            return true;
+        case GL_FRAGMENT_SHADING_RATE_NON_TRIVIAL_COMBINERS_SUPPORTED_EXT:
+            if (!extensions.fragmentShadingRateEXT)
+            {
+                return false;
+            }
+            *type      = GL_BOOL;
+            *numParams = 1;
+            return true;
     }
 
     if (glState.getClientVersion() >= Version(3, 2))
@@ -4782,7 +4811,7 @@ egl::Error QuerySurfaceAttrib(const Display *display,
             *value = surface->getConfig()->configID;
             break;
         case EGL_HEIGHT:
-            ANGLE_TRY(surface->getUserHeight(display, value));
+            ANGLE_TRY(surface->getUserSize(display, nullptr, value));
             break;
         case EGL_HORIZONTAL_RESOLUTION:
             *value = surface->getHorizontalResolution();
@@ -4825,7 +4854,7 @@ egl::Error QuerySurfaceAttrib(const Display *display,
             }
             break;
         case EGL_SWAP_BEHAVIOR:
-            *value = surface->getSwapBehavior();
+            *value = surface->getRequestedSwapBehavior();
             break;
         case EGL_TEXTURE_FORMAT:
             // The EGL spec states that value is not written if the surface is not a pbuffer
@@ -4845,7 +4874,7 @@ egl::Error QuerySurfaceAttrib(const Display *display,
             *value = surface->getVerticalResolution();
             break;
         case EGL_WIDTH:
-            ANGLE_TRY(surface->getUserWidth(display, value));
+            ANGLE_TRY(surface->getUserSize(display, value, nullptr));
             break;
         case EGL_POST_SUB_BUFFER_SUPPORTED_NV:
             *value = surface->isPostSubBufferSupported();
@@ -4896,7 +4925,7 @@ egl::Error QuerySurfaceAttrib(const Display *display,
             *value = surface->hasProtectedContent();
             break;
         case EGL_SURFACE_COMPRESSION_EXT:
-            *value = surface->getCompressionRate(display);
+            ANGLE_TRY(surface->getCompressionRate(display, context, value));
             break;
         default:
             UNREACHABLE();
@@ -4962,7 +4991,7 @@ egl::Error SetSurfaceAttrib(Surface *surface, EGLint attribute, EGLint value)
             surface->setMultisampleResolve(value);
             break;
         case EGL_SWAP_BEHAVIOR:
-            surface->setSwapBehavior(value);
+            surface->setRequestedSwapBehavior(value);
             break;
         case EGL_WIDTH:
             surface->setFixedWidth(value);

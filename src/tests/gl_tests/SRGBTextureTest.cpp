@@ -438,6 +438,39 @@ TEST_P(SRGBTextureTest, SRGBOverrideTextureParameter)
     EXPECT_PIXEL_COLOR_NEAR(0, 0, kLinearColor, 1.0);
 }
 
+// Test basic functionality of SRGB override on an immutable texture
+TEST_P(SRGBTextureTestES3, ImmutableTextureSRGBOverrideSample)
+{
+    ANGLE_SKIP_TEST_IF(!IsGLExtensionEnabled("GL_EXT_texture_format_sRGB_override"));
+
+    const std::array<GLColor, 2> linearColor = {kLinearColor, kLinearColor};
+
+    GLTexture tex;
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexStorage2D(GL_TEXTURE_2D, 2, GL_RGBA8, 2, 2);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 2, 2, GL_RGBA, GL_UNSIGNED_BYTE, linearColor.data());
+    glTexSubImage2D(GL_TEXTURE_2D, 1, 0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, linearColor.data());
+    ASSERT_GL_NO_ERROR();
+
+    glUseProgram(mProgram);
+    glUniform1i(mTextureLocation, 0);
+    glDisable(GL_DEPTH_TEST);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_FORMAT_SRGB_OVERRIDE_EXT, GL_NONE);
+    drawQuad(mProgram, "position", 0.5f);
+    EXPECT_PIXEL_COLOR_NEAR(0, 0, kLinearColor, 1.0);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_FORMAT_SRGB_OVERRIDE_EXT, GL_SRGB);
+    drawQuad(mProgram, "position", 0.5f);
+    EXPECT_PIXEL_COLOR_NEAR(0, 0, kNonlinearColor, 1.0);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_FORMAT_SRGB_OVERRIDE_EXT, GL_NONE);
+    drawQuad(mProgram, "position", 0.5f);
+    EXPECT_PIXEL_COLOR_NEAR(0, 0, kLinearColor, 1.0);
+}
+
 // Test that all supported formats can be overridden
 TEST_P(SRGBTextureTestES3, SRGBOverrideFormats)
 {
@@ -702,6 +735,114 @@ TEST_P(SRGBTextureTestES3, SRGBDecodeOverridePriority)
     EXPECT_PIXEL_COLOR_NEAR(0, 0, linearColor, 1.0);
 }
 
+// GL_RGBA, GL_RGB and GL_SRGB_ALPHA_EXT, GL_SRGB_EXT should be compatible formats and valid
+// combination.
+TEST_P(SRGBTextureTestES3, SRGBFormatCombinationValidation)
+{
+    ANGLE_SKIP_TEST_IF(!IsGLExtensionEnabled("GL_EXT_sRGB"));
+
+    typedef struct formatCombination
+    {
+        GLint internalformat;
+        GLenum format;
+        GLenum subFormat;
+    } formatCombination;
+
+    std::vector<formatCombination> combinations = {
+        {GL_SRGB_EXT, GL_RGB, GL_RGB},
+        {GL_SRGB_EXT, GL_SRGB_EXT, GL_RGB},
+        {GL_SRGB_ALPHA_EXT, GL_RGBA, GL_SRGB_ALPHA_EXT},
+        {GL_SRGB_ALPHA_EXT, GL_SRGB_ALPHA_EXT, GL_SRGB_ALPHA_EXT},
+        {GL_SRGB8, GL_SRGB_EXT, GL_RGB},
+        {GL_SRGB8_ALPHA8, GL_SRGB_ALPHA_EXT, GL_SRGB_ALPHA_EXT},
+        {GL_SRGB_EXT, GL_RGB, GL_SRGB_EXT},
+        {GL_SRGB_EXT, GL_SRGB_EXT, GL_SRGB_EXT},
+        {GL_SRGB_ALPHA_EXT, GL_RGBA, GL_RGBA},
+        {GL_SRGB_ALPHA_EXT, GL_SRGB_ALPHA_EXT, GL_RGBA},
+        {GL_SRGB8, GL_SRGB_EXT, GL_SRGB_EXT},
+        {GL_SRGB8_ALPHA8, GL_SRGB_ALPHA_EXT, GL_RGBA},
+    };
+
+    constexpr GLColor linearColor1(132, 55, 219, 255);
+    constexpr GLColor srgbColor1(190, 128, 238, 255);
+    constexpr GLColor linearColor2(13, 54, 133, 255);
+    constexpr GLColor srgbColor2(64, 127, 191, 255);
+    GLubyte srgbColor3D[] = {190, 128, 238, 255, 230, 159, 191, 255};
+
+    GLuint program3D = 0;
+    const char *vs3D =
+        "#version 300 es\n"
+        "out vec3 texcoord;\n"
+        "in vec4 position;\n"
+        "void main()\n"
+        "{\n"
+        "    gl_Position = vec4(position.xy, 0.0, 1.0);\n"
+        "    texcoord = (position.xyz * 0.5) + 0.5;\n"
+        "}\n";
+    const char *fs3D =
+        "#version 300 es\n"
+        "precision highp float;\n"
+        "uniform highp sampler3D tex3D;\n"
+        "in vec3 texcoord;\n"
+        "out vec4 fragColor;\n"
+        "void main()\n"
+        "{\n"
+        "    fragColor = texture(tex3D, vec3(texcoord.x, texcoord.z, texcoord.y));\n"
+        "}\n";
+    program3D = CompileProgram(vs3D, fs3D);
+    glUseProgram(program3D);
+    GLint texLocation3D = glGetUniformLocation(program3D, "tex3D");
+    ASSERT_NE(-1, texLocation3D);
+
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    for (auto comb : combinations)
+    {
+        GLTexture texSRGB;
+        glBindTexture(GL_TEXTURE_2D, texSRGB);
+        glTexImage2D(GL_TEXTURE_2D, 0, comb.internalformat, 1, 1, 0, comb.format, GL_UNSIGNED_BYTE,
+                     srgbColor1.data());
+        EXPECT_GL_NO_ERROR();
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glUseProgram(mProgram);
+        glUniform1i(mTextureLocation, 0);
+        drawQuad(mProgram, "position", 0.5f);
+        EXPECT_PIXEL_COLOR_NEAR(0, 0, linearColor1, 1.0);
+
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 1, 1, comb.subFormat, GL_UNSIGNED_BYTE,
+                        srgbColor2.data());
+        EXPECT_GL_NO_ERROR();
+        glUseProgram(mProgram);
+        glUniform1i(mTextureLocation, 0);
+        drawQuad(mProgram, "position", 0.5f);
+        EXPECT_PIXEL_COLOR_NEAR(0, 0, linearColor2, 1.0);
+
+        GLTexture tex3DSRGB;
+        glBindTexture(GL_TEXTURE_3D, tex3DSRGB);
+        glTexImage3D(GL_TEXTURE_3D, 0, comb.internalformat, 1, 1, 2, 0, comb.format,
+                     GL_UNSIGNED_BYTE, srgbColor3D);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        EXPECT_GL_NO_ERROR();
+        glUseProgram(program3D);
+        glUniform1i(texLocation3D, 0);
+        drawQuad(program3D, "position", 0.5f);
+        EXPECT_PIXEL_COLOR_NEAR(0, 0, linearColor1, 1.0);
+
+        glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, 0, 1, 1, 1, comb.subFormat, GL_UNSIGNED_BYTE,
+                        srgbColor2.data());
+        EXPECT_GL_NO_ERROR();
+        glUseProgram(program3D);
+        glUniform1i(texLocation3D, 0);
+        drawQuad(program3D, "position", 0.5f);
+        EXPECT_PIXEL_COLOR_NEAR(0, 0, linearColor2, 1.0);
+    }
+}
+
 // Test that mipmaps are generated correctly for sRGB textures
 TEST_P(SRGBTextureTestES3, GenerateMipmaps)
 {
@@ -782,9 +923,158 @@ TEST_P(SRGBTextureTestES3, GenerateMipmapsSolid)
     EXPECT_PIXEL_COLOR_NEAR(0, 0, color, 1);
 }
 
+class SRGBTextureTestES31 : public SRGBTextureTest
+{};
+
+// SRGB override sample an immutable texture then dispatch
+TEST_P(SRGBTextureTestES31, ImmutableTextureSRGBOverrideSampleThenDispatch)
+{
+    ANGLE_SKIP_TEST_IF(!IsGLExtensionEnabled("GL_EXT_texture_format_sRGB_override"));
+
+    GLTexture tex;
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, 1, 1);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, kLinearColor.data());
+    ASSERT_GL_NO_ERROR();
+
+    glUseProgram(mProgram);
+    glUniform1i(mTextureLocation, 0);
+    glDisable(GL_DEPTH_TEST);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_FORMAT_SRGB_OVERRIDE_EXT, GL_NONE);
+    drawQuad(mProgram, "position", 0.5f);
+    EXPECT_PIXEL_COLOR_NEAR(0, 0, kLinearColor, 1.0);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_FORMAT_SRGB_OVERRIDE_EXT, GL_SRGB);
+    drawQuad(mProgram, "position", 0.5f);
+    EXPECT_PIXEL_COLOR_NEAR(0, 0, kNonlinearColor, 1.0);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_FORMAT_SRGB_OVERRIDE_EXT, GL_NONE);
+    drawQuad(mProgram, "position", 0.5f);
+    EXPECT_PIXEL_COLOR_NEAR(0, 0, kLinearColor, 1.0);
+
+    // CS for RGBA8 format
+    constexpr char kCS1[] = R"(#version 310 es
+layout(local_size_x=1, local_size_y=1, local_size_z=1) in;
+layout(rgba8, binding = 0) writeonly uniform highp image2D image;
+void main()
+{
+    imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(1, 1, 0, 1));
+})";
+
+    // Dispatch with texture bound as image
+    ANGLE_GL_COMPUTE_PROGRAM(csProgram1, kCS1);
+    glUseProgram(csProgram1);
+    glBindImageTexture(0, tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+    glDispatchCompute(1, 1, 1);
+    glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
+
+    // Verify rendered color
+    glUseProgram(mProgram);
+    glUniform1i(mTextureLocation, 0);
+    drawQuad(mProgram, "position", 0.5f);
+    EXPECT_PIXEL_COLOR_NEAR(0, 0, GLColor::yellow, 1.0);
+}
+
+// Dispatch on an immutable texture then SRGB override sample
+TEST_P(SRGBTextureTestES31, ImmutableTextureDispatchThenSRGBOverrideSample)
+{
+    ANGLE_SKIP_TEST_IF(!IsGLExtensionEnabled("GL_EXT_texture_format_sRGB_override"));
+
+    GLTexture tex;
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, 1, 1);
+    ASSERT_GL_NO_ERROR();
+
+    // CS for RGBA8 format
+    constexpr char kCS[] = R"(#version 310 es
+layout(local_size_x=1, local_size_y=1, local_size_z=1) in;
+layout(rgba8ui, binding = 0) writeonly uniform highp uimage2D image;
+void main()
+{
+    imageStore(image, ivec2(gl_GlobalInvocationID.xy), uvec4(128, 128, 0, 255));
+})";
+
+    // Dispatch with texture bound as image and verify rendered color
+    constexpr GLColor kHalfYellow(128, 128, 0, 255);
+    ANGLE_GL_COMPUTE_PROGRAM(csProgram, kCS);
+    glUseProgram(csProgram);
+    glBindImageTexture(0, tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8UI);
+    glDispatchCompute(1, 1, 1);
+    glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
+
+    // Draw with sRGB override and verify rendered color
+    constexpr GLColor kHalfYellowDecodedAsSrgb(55, 55, 0, 255);
+    glUseProgram(mProgram);
+    glUniform1i(mTextureLocation, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_FORMAT_SRGB_OVERRIDE_EXT, GL_SRGB);
+    drawQuad(mProgram, "position", 0.5f);
+    EXPECT_PIXEL_COLOR_NEAR(0, 0, kHalfYellowDecodedAsSrgb, 1.0);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_FORMAT_SRGB_OVERRIDE_EXT, GL_NONE);
+    drawQuad(mProgram, "position", 0.5f);
+    EXPECT_PIXEL_COLOR_NEAR(0, 0, kHalfYellow, 1.0);
+}
+
+// Dispatch on an immutable texture then SRGB override and render
+TEST_P(SRGBTextureTestES31, ImmutableTextureDispatchThenSRGBOverrideRender)
+{
+    ANGLE_SKIP_TEST_IF(!IsGLExtensionEnabled("GL_EXT_sRGB_write_control"));
+    ANGLE_SKIP_TEST_IF(!IsGLExtensionEnabled("GL_EXT_texture_format_sRGB_override"));
+
+    GLTexture tex;
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, 1, 1);
+    ASSERT_GL_NO_ERROR();
+
+    // CS for RGBA8 format
+    constexpr char kCS[] = R"(#version 310 es
+layout(local_size_x=1, local_size_y=1, local_size_z=1) in;
+layout(rgba8ui, binding = 0) writeonly uniform highp uimage2D image;
+void main()
+{
+    imageStore(image, ivec2(gl_GlobalInvocationID.xy), uvec4(0, 255, 0, 255));
+})";
+
+    // Dispatch with texture bound as image and verify rendered color
+    ANGLE_GL_COMPUTE_PROGRAM(csProgram, kCS);
+    glUseProgram(csProgram);
+    glBindImageTexture(0, tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8UI);
+    glDispatchCompute(1, 1, 1);
+    glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
+
+    // Override texture format to sRGB
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_FORMAT_SRGB_OVERRIDE_EXT, GL_SRGB);
+    EXPECT_GL_NO_ERROR();
+
+    // Attach the texture to a framebuffer object
+    GLFramebuffer framebuffer;
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+    EXPECT_GL_NO_ERROR();
+
+    // Enable sRGB encoding (which should be a noop since the attachment encoding is linear)
+    // and render to framebuffer
+    glEnable(GL_FRAMEBUFFER_SRGB_EXT);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    ANGLE_GL_PROGRAM(gfxProgram, essl1_shaders::vs::Simple(), essl1_shaders::fs::UniformColor());
+    glUseProgram(gfxProgram);
+    GLint colorLocation = glGetUniformLocation(gfxProgram, essl1_shaders::ColorUniform());
+    ASSERT_NE(-1, colorLocation);
+    glUniform4fv(colorLocation, 1, GLColor::blue.toNormalizedVector().data());
+    drawQuad(gfxProgram, essl1_shaders::PositionAttrib(), 0.5f);
+    EXPECT_GL_NO_ERROR();
+    EXPECT_PIXEL_COLOR_NEAR(0, 0, GLColor::cyan, 1.0);
+}
+
 ANGLE_INSTANTIATE_TEST_ES2_AND_ES3(SRGBTextureTest);
 
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(SRGBTextureTestES3);
 ANGLE_INSTANTIATE_TEST_ES3(SRGBTextureTestES3);
+
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(SRGBTextureTestES31);
+ANGLE_INSTANTIATE_TEST_ES31(SRGBTextureTestES31);
 
 }  // namespace angle

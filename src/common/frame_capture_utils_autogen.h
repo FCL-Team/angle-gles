@@ -46,6 +46,7 @@ enum class ParamType
     TClientVertexArrayType,
     TClipDepthMode,
     TClipOrigin,
+    TCombinerOp,
     TCommandQueueInfo,
     TCommandQueueProperties,
     TCompositorTiming,
@@ -194,6 +195,7 @@ enum class ParamType
     TShaderProgramIDPointer,
     TShaderType,
     TShadingModel,
+    TShadingRate,
     TSurfaceID,
     TSyncID,
     TTextureEnvParameter,
@@ -235,6 +237,7 @@ enum class ParamType
     Tcl_image_descConstPointer,
     Tcl_image_formatConstPointer,
     Tcl_image_formatPointer,
+    Tcl_import_properties_armConstPointer,
     Tcl_int,
     Tcl_intPointer,
     Tcl_kernel,
@@ -271,7 +274,7 @@ enum class ParamType
     TvoidPointerPointer,
 };
 
-constexpr uint32_t kParamTypeCount = 234;
+constexpr uint32_t kParamTypeCount = 237;
 
 union ParamValue
 {
@@ -287,6 +290,7 @@ union ParamValue
     gl::ClientVertexArrayType ClientVertexArrayTypeVal;
     gl::ClipDepthMode ClipDepthModeVal;
     gl::ClipOrigin ClipOriginVal;
+    gl::CombinerOp CombinerOpVal;
     egl::CompositorTiming CompositorTimingVal;
     gl::ContextID ContextIDVal;
     gl::CullFaceMode CullFaceModeVal;
@@ -410,6 +414,7 @@ union ParamValue
     gl::ShaderProgramID *ShaderProgramIDPointerVal;
     gl::ShaderType ShaderTypeVal;
     gl::ShadingModel ShadingModelVal;
+    gl::ShadingRate ShadingRateVal;
     egl::SurfaceID SurfaceIDVal;
     gl::SyncID SyncIDVal;
     gl::TextureEnvParameter TextureEnvParameterVal;
@@ -490,6 +495,7 @@ union ParamValue
     const cl_image_desc *cl_image_descConstPointerVal;
     const cl_image_format *cl_image_formatConstPointerVal;
     cl_image_format *cl_image_formatPointerVal;
+    const cl_import_properties_arm *cl_import_properties_armConstPointerVal;
     cl_int cl_intVal;
     cl_int *cl_intPointerVal;
     cl_kernel cl_kernelVal;
@@ -584,6 +590,12 @@ template <>
 inline gl::ClipOrigin GetParamVal<ParamType::TClipOrigin, gl::ClipOrigin>(const ParamValue &value)
 {
     return value.ClipOriginVal;
+}
+
+template <>
+inline gl::CombinerOp GetParamVal<ParamType::TCombinerOp, gl::CombinerOp>(const ParamValue &value)
+{
+    return value.CombinerOpVal;
 }
 
 template <>
@@ -1390,6 +1402,13 @@ inline gl::ShadingModel GetParamVal<ParamType::TShadingModel, gl::ShadingModel>(
 }
 
 template <>
+inline gl::ShadingRate GetParamVal<ParamType::TShadingRate, gl::ShadingRate>(
+    const ParamValue &value)
+{
+    return value.ShadingRateVal;
+}
+
+template <>
 inline egl::SurfaceID GetParamVal<ParamType::TSurfaceID, egl::SurfaceID>(const ParamValue &value)
 {
     return value.SurfaceIDVal;
@@ -1923,6 +1942,14 @@ inline cl_image_format *GetParamVal<ParamType::Tcl_image_formatPointer, cl_image
 }
 
 template <>
+inline const cl_import_properties_arm *
+GetParamVal<ParamType::Tcl_import_properties_armConstPointer, const cl_import_properties_arm *>(
+    const ParamValue &value)
+{
+    return value.cl_import_properties_armConstPointerVal;
+}
+
+template <>
 inline cl_int GetParamVal<ParamType::Tcl_int, cl_int>(const ParamValue &value)
 {
     return value.cl_intVal;
@@ -2103,6 +2130,8 @@ T AccessParamValue(ParamType paramType, const ParamValue &value)
             return GetParamVal<ParamType::TClipDepthMode, T>(value);
         case ParamType::TClipOrigin:
             return GetParamVal<ParamType::TClipOrigin, T>(value);
+        case ParamType::TCombinerOp:
+            return GetParamVal<ParamType::TCombinerOp, T>(value);
         case ParamType::TCommandQueueInfo:
             return GetParamVal<ParamType::TCommandQueueInfo, T>(value);
         case ParamType::TCommandQueueProperties:
@@ -2399,6 +2428,8 @@ T AccessParamValue(ParamType paramType, const ParamValue &value)
             return GetParamVal<ParamType::TShaderType, T>(value);
         case ParamType::TShadingModel:
             return GetParamVal<ParamType::TShadingModel, T>(value);
+        case ParamType::TShadingRate:
+            return GetParamVal<ParamType::TShadingRate, T>(value);
         case ParamType::TSurfaceID:
             return GetParamVal<ParamType::TSurfaceID, T>(value);
         case ParamType::TSyncID:
@@ -2481,6 +2512,8 @@ T AccessParamValue(ParamType paramType, const ParamValue &value)
             return GetParamVal<ParamType::Tcl_image_formatConstPointer, T>(value);
         case ParamType::Tcl_image_formatPointer:
             return GetParamVal<ParamType::Tcl_image_formatPointer, T>(value);
+        case ParamType::Tcl_import_properties_armConstPointer:
+            return GetParamVal<ParamType::Tcl_import_properties_armConstPointer, T>(value);
         case ParamType::Tcl_int:
             return GetParamVal<ParamType::Tcl_int, T>(value);
         case ParamType::Tcl_intPointer:
@@ -2618,6 +2651,12 @@ template <>
 inline void SetParamVal<ParamType::TClipOrigin>(gl::ClipOrigin valueIn, ParamValue *valueOut)
 {
     valueOut->ClipOriginVal = valueIn;
+}
+
+template <>
+inline void SetParamVal<ParamType::TCombinerOp>(gl::CombinerOp valueIn, ParamValue *valueOut)
+{
+    valueOut->CombinerOpVal = valueIn;
 }
 
 template <>
@@ -3407,6 +3446,12 @@ inline void SetParamVal<ParamType::TShadingModel>(gl::ShadingModel valueIn, Para
 }
 
 template <>
+inline void SetParamVal<ParamType::TShadingRate>(gl::ShadingRate valueIn, ParamValue *valueOut)
+{
+    valueOut->ShadingRateVal = valueIn;
+}
+
+template <>
 inline void SetParamVal<ParamType::TSurfaceID>(egl::SurfaceID valueIn, ParamValue *valueOut)
 {
     valueOut->SurfaceIDVal = valueIn;
@@ -3923,6 +3968,14 @@ inline void SetParamVal<ParamType::Tcl_image_formatPointer>(cl_image_format *val
 }
 
 template <>
+inline void SetParamVal<ParamType::Tcl_import_properties_armConstPointer>(
+    const cl_import_properties_arm *valueIn,
+    ParamValue *valueOut)
+{
+    valueOut->cl_import_properties_armConstPointerVal = valueIn;
+}
+
+template <>
 inline void SetParamVal<ParamType::Tcl_int>(cl_int valueIn, ParamValue *valueOut)
 {
     valueOut->cl_intVal = valueIn;
@@ -4113,6 +4166,9 @@ void InitParamValue(ParamType paramType, T valueIn, ParamValue *valueOut)
             break;
         case ParamType::TClipOrigin:
             SetParamVal<ParamType::TClipOrigin>(valueIn, valueOut);
+            break;
+        case ParamType::TCombinerOp:
+            SetParamVal<ParamType::TCombinerOp>(valueIn, valueOut);
             break;
         case ParamType::TCommandQueueInfo:
             SetParamVal<ParamType::TCommandQueueInfo>(valueIn, valueOut);
@@ -4558,6 +4614,9 @@ void InitParamValue(ParamType paramType, T valueIn, ParamValue *valueOut)
         case ParamType::TShadingModel:
             SetParamVal<ParamType::TShadingModel>(valueIn, valueOut);
             break;
+        case ParamType::TShadingRate:
+            SetParamVal<ParamType::TShadingRate>(valueIn, valueOut);
+            break;
         case ParamType::TSurfaceID:
             SetParamVal<ParamType::TSurfaceID>(valueIn, valueOut);
             break;
@@ -4680,6 +4739,9 @@ void InitParamValue(ParamType paramType, T valueIn, ParamValue *valueOut)
             break;
         case ParamType::Tcl_image_formatPointer:
             SetParamVal<ParamType::Tcl_image_formatPointer>(valueIn, valueOut);
+            break;
+        case ParamType::Tcl_import_properties_armConstPointer:
+            SetParamVal<ParamType::Tcl_import_properties_armConstPointer>(valueIn, valueOut);
             break;
         case ParamType::Tcl_int:
             SetParamVal<ParamType::Tcl_int>(valueIn, valueOut);

@@ -12,6 +12,7 @@
 
 import difflib
 import os
+import re
 import sys
 import xml.etree.ElementTree as etree
 
@@ -90,6 +91,7 @@ gles_requestable_extensions = [
     "GL_ARM_rgba8",
     "GL_ARM_shader_framebuffer_fetch",
     "GL_ARM_shader_framebuffer_fetch_depth_stencil",
+    "GL_ARM_texture_unnormalized_coordinates",
     "GL_EXT_base_instance",
     "GL_EXT_blend_func_extended",
     "GL_EXT_blend_minmax",
@@ -144,6 +146,7 @@ gles_requestable_extensions = [
     "GL_EXT_shader_io_blocks",
     "GL_EXT_shader_non_constant_global_initializers",
     "GL_EXT_shader_texture_lod",
+    "GL_EXT_shader_texture_samples",
     "GL_EXT_shadow_samplers",
     "GL_EXT_sRGB",
     "GL_EXT_tessellation_shader",
@@ -243,6 +246,7 @@ gles_requestable_extensions = [
     "GL_OES_vertex_type_10_10_10_2",
     "GL_OVR_multiview",
     "GL_OVR_multiview2",
+    "GL_OVR_multiview_multisampled_render_to_texture",
     "GL_QCOM_framebuffer_foveated",
     "GL_QCOM_render_shared_exponent",
     "GL_QCOM_shading_rate",
@@ -418,6 +422,7 @@ supported_egl_extensions = [
     "EGL_KHR_surfaceless_context",
     "EGL_KHR_swap_buffers_with_damage",
     "EGL_KHR_wait_sync",
+    "EGL_NV_context_priority_realtime",
     "EGL_NV_post_sub_buffer",
     "EGL_NV_stream_consumer_gltexture_yuv",
 ]
@@ -425,6 +430,9 @@ supported_egl_extensions = [
 check_sorted('supported_egl_extensions', supported_egl_extensions)
 
 supported_cl_extensions = [
+    # OpenCL 1.0
+    "cl_arm_import_memory",
+
     # Since OpenCL 1.1
     "cl_khr_byte_addressable_store",
     "cl_khr_global_int32_base_atomics",
@@ -437,12 +445,16 @@ supported_cl_extensions = [
     "cl_khr_depth_images",
     "cl_khr_image2d_from_buffer",
 
+    # OpenCL 3.0
+    "cl_khr_external_memory",
+
     # Optional
     "cl_khr_extended_versioning",
     "cl_khr_fp64",
     "cl_khr_icd",
     "cl_khr_int64_base_atomics",
     "cl_khr_int64_extended_atomics",
+    "cl_khr_priority_hints",
 ]
 
 # Strip these suffixes from Context entry point names. NV is excluded (for now).
@@ -485,7 +497,7 @@ class apis:
     CL = 'CL'
 
 # For GLenum types
-api_enums = {apis.GL: 'BigGLEnum', apis.GLES: 'GLESEnum'}
+api_enums = {apis.GLES: 'GLESEnum'}
 default_enum_group_name = 'AllEnums'
 
 
@@ -549,6 +561,7 @@ class RegistryXML:
         self.all_cmd_names = CommandNames()
         self.commands = {}
         self.sources_by_command = {}
+        self.sources_by_command_no_suffix = {}
 
     def _AppendANGLEExts(self, ext_file):
         angle_ext_tree = etree.parse(script_relative(ext_file))
@@ -577,6 +590,7 @@ class RegistryXML:
         # Reverse cache for all places a command may be defined in.
         for cmd in commands:
             self.sources_by_command.setdefault(cmd, []).append(annotation)
+            self.sources_by_command_no_suffix.setdefault(cmd, []).append(annotation)
 
         # Remove commands that have already been processed
         current_cmds = self.all_cmd_names.get_all_commands()
@@ -613,11 +627,16 @@ class RegistryXML:
         self.ext_data = {}
         self.ext_dupes = {}
         ext_annotations = {}
+        ext_prefixes = set()
 
         for extension in self.root.findall("extensions/extension"):
             extension_name = extension.attrib['name']
             if not extension_name in supported_extensions:
                 continue
+
+            # Extract the extension prefix
+            if (extension_name.startswith("GL_")):
+                ext_prefixes.add(re.match(r"^GL_([A-Z]+)_", extension_name).group(1))
 
             ext_annotations[extension_name] = self._ClassifySupport(extension)
 
@@ -644,6 +663,12 @@ class RegistryXML:
             # Reverse cache for all places a command may be defined in.
             for cmd in ext_cmd_names:
                 self.sources_by_command.setdefault(cmd, []).append(extension_name)
+
+                for prefix in ext_prefixes:
+                    if cmd.endswith(prefix):
+                        self.sources_by_command_no_suffix.setdefault(cmd[:-len(prefix)],
+                                                                     []).append(extension_name)
+                        break
 
             # Detect and filter duplicate extensions.
             dupes = []

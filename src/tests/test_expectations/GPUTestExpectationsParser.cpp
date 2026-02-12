@@ -4,6 +4,10 @@
 // found in the LICENSE file.
 //
 
+#ifdef UNSAFE_BUFFERS_BUILD
+#    pragma allow_unsafe_buffers
+#endif
+
 #include "GPUTestExpectationsParser.h"
 
 #include <stddef.h>
@@ -62,6 +66,8 @@ enum Token
     kConfigVMWare,
     kConfigApple,
     kConfigQualcomm,
+    kConfigARM,
+    kConfigSamsung,
     // build type
     kConfigRelease,
     kConfigDebug,
@@ -105,6 +111,8 @@ enum Token
     kConfigASan,
     kConfigTSan,
     kConfigUBSan,
+    // Translator
+    kConfigIR,
     // expectation
     kExpectationPass,
     kExpectationFail,
@@ -188,6 +196,8 @@ constexpr TokenInfo kTokenData[kNumberOfTokens] = {
     {"vmware", GPUTestConfig::kConditionVMWare},
     {"apple", GPUTestConfig::kConditionApple},
     {"qualcomm", GPUTestConfig::kConditionQualcomm},
+    {"arm", GPUTestConfig::kConditionARM},
+    {"samsung", GPUTestConfig::kConditionSamsung},
     {"release", GPUTestConfig::kConditionRelease},
     {"debug", GPUTestConfig::kConditionDebug},
     {"d3d9", GPUTestConfig::kConditionD3D9},
@@ -225,6 +235,7 @@ constexpr TokenInfo kTokenData[kNumberOfTokens] = {
     {"asan", GPUTestConfig::kConditionASan},
     {"tsan", GPUTestConfig::kConditionTSan},
     {"ubsan", GPUTestConfig::kConditionUBSan},
+    {"ir", GPUTestConfig::kConditionIR},
     {"pass", GPUTestConfig::kConditionNone, GPUTestExpectationsParser::kGpuTestPass},
     {"fail", GPUTestConfig::kConditionNone, GPUTestExpectationsParser::kGpuTestFail},
     {"flaky", GPUTestConfig::kConditionNone, GPUTestExpectationsParser::kGpuTestFlaky},
@@ -523,6 +534,8 @@ bool GPUTestExpectationsParser::parseLine(const GPUTestConfig *config,
             case kConfigVMWare:
             case kConfigApple:
             case kConfigQualcomm:
+            case kConfigARM:
+            case kConfigSamsung:
             case kConfigRelease:
             case kConfigDebug:
             case kConfigD3D9:
@@ -560,6 +573,7 @@ bool GPUTestExpectationsParser::parseLine(const GPUTestConfig *config,
             case kConfigASan:
             case kConfigTSan:
             case kConfigUBSan:
+            case kConfigIR:
                 // MODIFIERS, check each condition and add accordingly.
                 if (stage != kLineParserConfigs && stage != kLineParserBugID)
                 {

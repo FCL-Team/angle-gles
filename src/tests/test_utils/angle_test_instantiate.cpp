@@ -7,6 +7,10 @@
 // angle_test_instantiate.cpp: Adds support for filtering parameterized
 // tests by platform, so we skip unsupported configs.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+#    pragma allow_unsafe_libc_calls
+#endif
+
 #include "test_utils/angle_test_instantiate.h"
 
 #include <algorithm>
@@ -340,6 +344,11 @@ bool IsIntelUHD630Mobile()
 bool IsAMD()
 {
     return HasSystemVendorID(kVendorID_AMD);
+}
+
+bool IsSamsung()
+{
+    return HasSystemVendorID(kVendorID_Samsung);
 }
 
 bool IsAppleGPU()

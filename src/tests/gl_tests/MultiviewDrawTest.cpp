@@ -3,9 +3,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 //
-// Multiview draw tests:
-// Test issuing multiview Draw* commands.
+// MultiviewDrawTest.cpp:
+//   Test issuing multiview Draw* commands.
 //
+
+#ifdef UNSAFE_BUFFERS_BUILD
+#    pragma allow_unsafe_buffers
+#endif
 
 #include "platform/autogen/FeaturesD3D_autogen.h"
 #include "test_utils/MultiviewTest.h"
@@ -1212,38 +1216,34 @@ TEST_P(MultiviewRenderTest, DrawArraysFourViews)
     ANGLE_SKIP_TEST_IF(!requestMultiviewExtension(isMultisampled()));
     ANGLE_SKIP_TEST_IF(IsARM64() && IsWindows() && IsD3D());
 
-    const std::string VS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        " : require\n"
-        "layout(num_views = 4) in;\n"
-        "in vec4 vPosition;\n"
-        "void main()\n"
-        "{\n"
-        "   if (gl_ViewID_OVR == 0u) {\n"
-        "       gl_Position.x = vPosition.x*0.25 - 0.75;\n"
-        "   } else if (gl_ViewID_OVR == 1u) {\n"
-        "       gl_Position.x = vPosition.x*0.25 - 0.25;\n"
-        "   } else if (gl_ViewID_OVR == 2u) {\n"
-        "       gl_Position.x = vPosition.x*0.25 + 0.25;\n"
-        "   } else {\n"
-        "       gl_Position.x = vPosition.x*0.25 + 0.75;\n"
-        "   }"
-        "   gl_Position.yzw = vPosition.yzw;\n"
-        "}\n";
+    const std::string VS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+layout(num_views = 4) in;
+in vec4 vPosition;
+void main()
+{
+   if (gl_ViewID_OVR == 0u) {
+       gl_Position.x = vPosition.x*0.25 - 0.75;
+   } else if (gl_ViewID_OVR == 1u) {
+       gl_Position.x = vPosition.x*0.25 - 0.25;
+   } else if (gl_ViewID_OVR == 2u) {
+       gl_Position.x = vPosition.x*0.25 + 0.25;
+   } else {
+       gl_Position.x = vPosition.x*0.25 + 0.75;
+   }
+   gl_Position.yzw = vPosition.yzw;
+})";
 
-    const std::string FS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        " : require\n"
-        "precision mediump float;\n"
-        "out vec4 col;\n"
-        "void main()\n"
-        "{\n"
-        "    col = vec4(0,1,0,1);\n"
-        "}\n";
+    const std::string FS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+precision mediump float;
+out vec4 col;
+void main()
+{
+    col = vec4(0,1,0,1);
+})";
 
     updateFBOs(4, 1, 4);
     ANGLE_GL_PROGRAM(program, VS.c_str(), FS.c_str());
@@ -1275,36 +1275,32 @@ TEST_P(MultiviewRenderTest, DrawArraysInstanced)
     ANGLE_SKIP_TEST_IF(!requestMultiviewExtension(isMultisampled()));
     ANGLE_SKIP_TEST_IF(IsARM64() && IsWindows() && IsD3D());
 
-    const std::string VS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "layout(num_views = 2) in;\n"
-        "in vec4 vPosition;\n"
-        "void main()\n"
-        "{\n"
-        "       vec4 p = vPosition;\n"
-        "       if (gl_InstanceID == 1){\n"
-        "               p.y = p.y * 0.5 + 0.5;\n"
-        "       } else {\n"
-        "               p.y = p.y * 0.5 - 0.5;\n"
-        "       }\n"
-        "       gl_Position.x = (gl_ViewID_OVR == 0u ? p.x * 0.5 + 0.5 : p.x * 0.5 - 0.5);\n"
-        "       gl_Position.yzw = p.yzw;\n"
-        "}\n";
+    const std::string VS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+layout(num_views = 2) in;
+in vec4 vPosition;
+void main()
+{
+       vec4 p = vPosition;
+       if (gl_InstanceID == 1){
+               p.y = p.y * 0.5 + 0.5;
+       } else {
+               p.y = p.y * 0.5 - 0.5;
+       }
+       gl_Position.x = (gl_ViewID_OVR == 0u ? p.x * 0.5 + 0.5 : p.x * 0.5 - 0.5);
+       gl_Position.yzw = p.yzw;
+})";
 
-    const std::string FS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "precision mediump float;\n"
-        "out vec4 col;\n"
-        "void main()\n"
-        "{\n"
-        "    col = vec4(0,1,0,1);\n"
-        "}\n";
+    const std::string FS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+precision mediump float;
+out vec4 col;
+void main()
+{
+    col = vec4(0,1,0,1);
+})";
 
     const int kViewWidth  = 2;
     const int kViewHeight = 2;
@@ -1320,15 +1316,81 @@ TEST_P(MultiviewRenderTest, DrawArraysInstanced)
     const GLubyte expectedGreenChannel[kNumViews][kViewHeight][kViewWidth] = {{{0, 255}, {0, 255}},
                                                                               {{255, 0}, {255, 0}}};
 
-    for (int view = 0; view < 2; ++view)
+    for (int view = 0; view < kNumViews; ++view)
     {
-        for (int y = 0; y < 2; ++y)
+        for (int y = 0; y < kViewHeight; ++y)
         {
-            for (int x = 0; x < 2; ++x)
+            for (int x = 0; x < kViewWidth; ++x)
             {
                 EXPECT_EQ(GLColor(0, expectedGreenChannel[view][y][x], 0,
                                   expectedGreenChannel[view][y][x]),
                           GetViewColor(x, y, view));
+            }
+        }
+    }
+}
+
+// The test verifies that gl_InstanceID splits between views correctly.
+TEST_P(MultiviewRenderTest, DrawArraysInstancedMany)
+{
+    ANGLE_SKIP_TEST_IF(!requestMultiviewExtension(isMultisampled()));
+    ANGLE_SKIP_TEST_IF(IsARM64() && IsWindows() && IsD3D());
+
+    // If there are N views, every N instances increment gl_InstanceID by one, and gl_ViewID_OVR
+    // changes from 0 through N-1 for those instances.  Four views are used to make sure the
+    // emulation logic in some backends handle more than 2 views correctly.
+    GLint maxViews = 0;
+    glGetIntegerv(GL_MAX_VIEWS_OVR, &maxViews);
+    ANGLE_SKIP_TEST_IF(maxViews < 4);
+
+    const std::string VS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+layout(num_views = 4) in;
+in vec4 vPosition;
+out vec4 vColor;
+void main()
+{
+       vec4 p = vPosition;
+       // There will be four instance IDs, with four views each.  Make each instance draw to
+       // a different region of the framebuffer.  The view ID selects the color
+       p.x = p.x * 0.5 + ((gl_InstanceID & 0x1) == 0 ? -0.5 : 0.5);
+       p.y = p.y * 0.5 + ((gl_InstanceID & 0x2) == 0 ? -0.5 : 0.5);
+
+       gl_Position = p;
+       vColor = vec4(float(gl_ViewID_OVR) * 0.25, float(gl_InstanceID % 4) * 0.25, 0, 1);
+})";
+
+    const std::string FS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+precision mediump float;
+in vec4 vColor;
+out vec4 col;
+void main()
+{
+    col = vColor;
+})";
+
+    const int kViewWidth  = 2;
+    const int kViewHeight = 2;
+    const int kNumViews   = 4;
+    updateFBOs(kViewWidth, kViewHeight, kNumViews);
+    ANGLE_GL_PROGRAM(program, VS.c_str(), FS.c_str());
+
+    drawQuadInstanced(program, "vPosition", 0.0f, 1.0f, true, 16u);
+    ASSERT_GL_NO_ERROR();
+
+    resolveMultisampledFBO();
+
+    for (int view = 0; view < kNumViews; ++view)
+    {
+        for (int y = 0; y < kViewHeight; ++y)
+        {
+            for (int x = 0; x < kViewWidth; ++x)
+            {
+                EXPECT_COLOR_NEAR(GLColor(view * 255 / 4, (y * 2 + x) * 255 / 4, 0, 255),
+                                  GetViewColor(x, y, view), 1);
             }
         }
     }
@@ -1353,34 +1415,30 @@ TEST_P(MultiviewRenderTest, AttribDivisor)
         ignoreD3D11SDKLayersWarnings();
     }
 
-    const std::string VS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        " : require\n"
-        "layout(num_views = 2) in;\n"
-        "in vec3 vPosition;\n"
-        "in float offsetX;\n"
-        "in float offsetY;\n"
-        "void main()\n"
-        "{\n"
-        "       vec4 p = vec4(vPosition, 1.);\n"
-        "       p.xy = p.xy * 0.25 - vec2(0.75) + vec2(offsetX, offsetY);\n"
-        "       gl_Position.x = (gl_ViewID_OVR == 0u ? p.x : p.x + 1.0);\n"
-        "       gl_Position.yzw = p.yzw;\n"
-        "}\n";
+    const std::string VS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+layout(num_views = 2) in;
+in vec3 vPosition;
+in float offsetX;
+in float offsetY;
+void main()
+{
+       vec4 p = vec4(vPosition, 1.);
+       p.xy = p.xy * 0.25 - vec2(0.75) + vec2(offsetX, offsetY);
+       gl_Position.x = (gl_ViewID_OVR == 0u ? p.x : p.x + 1.0);
+       gl_Position.yzw = p.yzw;
+})";
 
-    const std::string FS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "precision mediump float;\n"
-        "out vec4 col;\n"
-        "void main()\n"
-        "{\n"
-        "    col = vec4(0,1,0,1);\n"
-        "}\n";
+    const std::string FS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+precision mediump float;
+out vec4 col;
+void main()
+{
+    col = vec4(0,1,0,1);
+})";
 
     const int kViewWidth  = 4;
     const int kViewHeight = 4;
@@ -1438,52 +1496,46 @@ TEST_P(MultiviewRenderTest, DivisorOrderOfOperation)
     updateFBOs(1, 1, 2);
 
     // Create multiview program.
-    const std::string VS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "layout(num_views = 2) in;\n"
-        "layout(location = 0) in vec2 vPosition;\n"
-        "layout(location = 1) in float offsetX;\n"
-        "void main()\n"
-        "{\n"
-        "       vec4 p = vec4(vPosition, 0.0, 1.0);\n"
-        "       p.x += offsetX;\n"
-        "       gl_Position = p;\n"
-        "}\n";
+    const std::string VS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+layout(num_views = 2) in;
+layout(location = 0) in vec2 vPosition;
+layout(location = 1) in float offsetX;
+void main()
+{
+       vec4 p = vec4(vPosition, 0.0, 1.0);
+       p.x += offsetX;
+       gl_Position = p;
+})";
 
-    const std::string FS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        " : require\n"
-        "precision mediump float;\n"
-        "out vec4 col;\n"
-        "void main()\n"
-        "{\n"
-        "    col = vec4(0,1,0,1);\n"
-        "}\n";
+    const std::string FS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+precision mediump float;
+out vec4 col;
+void main()
+{
+    col = vec4(0,1,0,1);
+})";
 
     ANGLE_GL_PROGRAM(program, VS.c_str(), FS.c_str());
 
-    constexpr char kStubVS[] =
-        "#version 300 es\n"
-        "layout(location = 0) in vec2 vPosition;\n"
-        "layout(location = 1) in float offsetX;\n"
-        "void main()\n"
-        "{\n"
-        "       gl_Position = vec4(vPosition, 0.0, 1.0);\n"
-        "}\n";
+    constexpr char kStubVS[] = R"(#version 300 es
+layout(location = 0) in vec2 vPosition;
+layout(location = 1) in float offsetX;
+void main()
+{
+       gl_Position = vec4(vPosition, 0.0, 1.0);
+})";
 
-    constexpr char kStubFS[] =
-        "#version 300 es\n"
-        "precision mediump float;\n"
-        "out vec4 col;\n"
-        "void main()\n"
-        "{\n"
-        "    col = vec4(0,0,0,1);\n"
-        "}\n";
+    constexpr char kStubFS[] = R"(#version 300 es
+precision mediump float;
+out vec4 col;
+void main()
+{
+    col = vec4(0,0,0,1);
+})";
 
     ANGLE_GL_PROGRAM(stubProgram, kStubVS, kStubFS);
 
@@ -1603,30 +1655,27 @@ TEST_P(MultiviewOcclusionQueryTest, OcclusionQueryNothingVisible)
     ANGLE_SKIP_TEST_IF(!requestOcclusionQueryExtension());
     ANGLE_SKIP_TEST_IF(IsARM64() && IsWindows() && IsD3D());
 
-    const std::string VS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "layout(num_views = 2) in;\n"
-        "in vec3 vPosition;\n"
-        "void main()\n"
-        "{\n"
-        "       gl_Position.x = 2.0;\n"
-        "       gl_Position.yzw = vec3(vPosition.yz, 1.);\n"
-        "}\n";
+    const std::string VS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+layout(num_views = 2) in;
+in vec3 vPosition;
+void main()
+{
+       gl_Position.x = 2.0;
+       gl_Position.yzw = vec3(vPosition.yz, 1.);
+})";
 
-    const std::string FS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        " : require\n"
-        "precision mediump float;\n"
-        "out vec4 col;\n"
-        "void main()\n"
-        "{\n"
-        "    col = vec4(1,0,0,0);\n"
-        "}\n";
+    const std::string FS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+precision mediump float;
+out vec4 col;
+void main()
+{
+    col = vec4(1,0,0,0);
+})";
+
     ANGLE_GL_PROGRAM(program, VS.c_str(), FS.c_str());
     updateFBOs(1, 1, 2);
 
@@ -1642,30 +1691,27 @@ TEST_P(MultiviewOcclusionQueryTest, OcclusionQueryOnlyLeftVisible)
     ANGLE_SKIP_TEST_IF(!requestMultiviewExtension());
     ANGLE_SKIP_TEST_IF(!requestOcclusionQueryExtension());
 
-    const std::string VS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "layout(num_views = 2) in;\n"
-        "in vec3 vPosition;\n"
-        "void main()\n"
-        "{\n"
-        "       gl_Position.x = gl_ViewID_OVR == 0u ? vPosition.x : 2.0;\n"
-        "       gl_Position.yzw = vec3(vPosition.yz, 1.);\n"
-        "}\n";
+    const std::string VS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+layout(num_views = 2) in;
+in vec3 vPosition;
+void main()
+{
+       gl_Position.x = gl_ViewID_OVR == 0u ? vPosition.x : 2.0;
+       gl_Position.yzw = vec3(vPosition.yz, 1.);
+})";
 
-    const std::string FS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "precision mediump float;\n"
-        "out vec4 col;\n"
-        "void main()\n"
-        "{\n"
-        "    col = vec4(1,0,0,0);\n"
-        "}\n";
+    const std::string FS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+precision mediump float;
+out vec4 col;
+void main()
+{
+    col = vec4(1,0,0,0);
+})";
+
     ANGLE_GL_PROGRAM(program, VS.c_str(), FS.c_str());
     updateFBOs(1, 1, 2);
 
@@ -1681,30 +1727,27 @@ TEST_P(MultiviewOcclusionQueryTest, OcclusionQueryOnlyRightVisible)
     ANGLE_SKIP_TEST_IF(!requestMultiviewExtension());
     ANGLE_SKIP_TEST_IF(!requestOcclusionQueryExtension());
 
-    const std::string VS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "layout(num_views = 2) in;\n"
-        "in vec3 vPosition;\n"
-        "void main()\n"
-        "{\n"
-        "       gl_Position.x = gl_ViewID_OVR == 1u ? vPosition.x : 2.0;\n"
-        "       gl_Position.yzw = vec3(vPosition.yz, 1.);\n"
-        "}\n";
+    const std::string VS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+layout(num_views = 2) in;
+in vec3 vPosition;
+void main()
+{
+       gl_Position.x = gl_ViewID_OVR == 1u ? vPosition.x : 2.0;
+       gl_Position.yzw = vec3(vPosition.yz, 1.);
+})";
 
-    const std::string FS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "precision mediump float;\n"
-        "out vec4 col;\n"
-        "void main()\n"
-        "{\n"
-        "    col = vec4(1,0,0,0);\n"
-        "}\n";
+    const std::string FS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+precision mediump float;
+out vec4 col;
+void main()
+{
+    col = vec4(1,0,0,0);
+})";
+
     ANGLE_GL_PROGRAM(program, VS.c_str(), FS.c_str());
     updateFBOs(1, 1, 2);
 
@@ -1722,25 +1765,21 @@ TEST_P(MultiviewProgramGenerationTest, SimpleProgram)
         return;
     }
 
-    const std::string VS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "layout(num_views = 2) in;\n"
-        "void main()\n"
-        "{\n"
-        "}\n";
+    const std::string VS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+layout(num_views = 2) in;
+void main()
+{
+})";
 
-    const std::string FS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "precision mediump float;\n"
-        "void main()\n"
-        "{\n"
-        "}\n";
+    const std::string FS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+precision mediump float;
+void main()
+{
+})";
 
     ANGLE_GL_PROGRAM(program, VS.c_str(), FS.c_str());
     glUseProgram(program);
@@ -1757,30 +1796,26 @@ TEST_P(MultiviewProgramGenerationTest, UseViewIDInVertexShader)
         return;
     }
 
-    const std::string VS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "layout(num_views = 2) in;\n"
-        "void main()\n"
-        "{\n"
-        "   if (gl_ViewID_OVR == 0u) {\n"
-        "       gl_Position = vec4(1,0,0,1);\n"
-        "   } else {\n"
-        "       gl_Position = vec4(-1,0,0,1);\n"
-        "   }\n"
-        "}\n";
+    const std::string VS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+layout(num_views = 2) in;
+void main()
+{
+   if (gl_ViewID_OVR == 0u) {
+       gl_Position = vec4(1,0,0,1);
+   } else {
+       gl_Position = vec4(-1,0,0,1);
+   }
+})";
 
-    const std::string FS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "precision mediump float;\n"
-        "void main()\n"
-        "{\n"
-        "}\n";
+    const std::string FS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+precision mediump float;
+void main()
+{
+})";
 
     ANGLE_GL_PROGRAM(program, VS.c_str(), FS.c_str());
     glUseProgram(program);
@@ -1797,31 +1832,27 @@ TEST_P(MultiviewProgramGenerationTest, UseViewIDInFragmentShader)
         return;
     }
 
-    const std::string VS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "layout(num_views = 2) in;\n"
-        "void main()\n"
-        "{\n"
-        "}\n";
+    const std::string VS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+layout(num_views = 2) in;
+void main()
+{
+})";
 
-    const std::string FS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "precision mediump float;\n"
-        "out vec4 col;\n"
-        "void main()\n"
-        "{\n"
-        "   if (gl_ViewID_OVR == 0u) {\n"
-        "       col = vec4(1,0,0,1);\n"
-        "   } else {\n"
-        "       col = vec4(-1,0,0,1);\n"
-        "   }\n"
-        "}\n";
+    const std::string FS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+precision mediump float;
+out vec4 col;
+void main()
+{
+   if (gl_ViewID_OVR == 0u) {
+       col = vec4(1,0,0,1);
+   } else {
+       col = vec4(-1,0,0,1);
+   }
+})";
 
     ANGLE_GL_PROGRAM(program, VS.c_str(), FS.c_str());
     glUseProgram(program);
@@ -1839,30 +1870,27 @@ TEST_P(MultiviewRenderPrimitiveTest, Points)
 
     ANGLE_SKIP_TEST_IF(IsARM64() && IsWindows() && IsD3D());
 
-    const std::string VS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "layout(num_views = 2) in;\n"
-        "layout(location=0) in vec2 vPosition;\n"
-        "void main()\n"
-        "{\n"
-        "   gl_PointSize = 1.0;\n"
-        "   gl_Position = vec4(vPosition.xy, 0.0, 1.0);\n"
-        "}\n";
+    const std::string VS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+layout(num_views = 2) in;
+layout(location=0) in vec2 vPosition;
+void main()
+{
+   gl_PointSize = 1.0;
+   gl_Position = vec4(vPosition.xy, 0.0, 1.0);
+})";
 
-    const std::string FS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "precision mediump float;\n"
-        "out vec4 col;\n"
-        "void main()\n"
-        "{\n"
-        "   col = vec4(0,1,0,1);\n"
-        "}\n";
+    const std::string FS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+precision mediump float;
+out vec4 col;
+void main()
+{
+   col = vec4(0,1,0,1);
+})";
+
     ANGLE_GL_PROGRAM(program, VS.c_str(), FS.c_str());
     glUseProgram(program);
 
@@ -2089,39 +2117,34 @@ TEST_P(MultiviewRenderTest, ProgramRelinkUpdatesAttribDivisor)
     const int kViewHeight = 1;
     const int kNumViews   = 2;
 
-    const std::string FS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "precision mediump float;\n"
-        "in vec4 oColor;\n"
-        "out vec4 col;\n"
-        "void main()\n"
-        "{\n"
-        "    col = oColor;\n"
-        "}\n";
+    const std::string FS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+precision mediump float;
+in vec4 oColor;
+out vec4 col;
+void main()
+{
+    col = oColor;
+})";
 
     auto generateVertexShaderSource = [](int numViews, std::string extensionName) -> std::string {
-        std::string source =
-            "#version 300 es\n"
-            "#extension " +
-            extensionName +
-            ": require\n"
-            "layout(num_views = " +
-            ToString(numViews) +
-            ") in;\n"
-            "in vec3 vPosition;\n"
-            "in float vOffsetX;\n"
-            "in vec4 vColor;\n"
-            "out vec4 oColor;\n"
-            "void main()\n"
-            "{\n"
-            "       vec4 p = vec4(vPosition, 1.);\n"
-            "       p.x = p.x * 0.25 - 0.75 + vOffsetX;\n"
-            "       oColor = vColor;\n"
-            "       gl_Position = p;\n"
-            "}\n";
+        std::string source = R"(#version 300 es
+#extension )" + extensionName +
+                             R"( : require
+layout(num_views = )" + ToString(numViews) +
+                             R"() in;
+in vec3 vPosition;
+in float vOffsetX;
+in vec4 vColor;
+out vec4 oColor;
+void main()
+{
+    vec4 p = vec4(vPosition, 1.);
+    p.x = p.x * 0.25 - 0.75 + vOffsetX;
+    oColor = vColor;
+    gl_Position = p;
+})";
         return source;
     };
 
@@ -2287,37 +2310,33 @@ TEST_P(MultiviewRenderTest, SelectColorBasedOnViewIDOVR)
         return;
     }
 
-    const std::string VS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "layout(num_views = 3) in;\n"
-        "in vec3 vPosition;\n"
-        "void main()\n"
-        "{\n"
-        "   gl_Position = vec4(vPosition, 1.);\n"
-        "}\n";
+    const std::string VS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+layout(num_views = 3) in;
+in vec3 vPosition;
+void main()
+{
+   gl_Position = vec4(vPosition, 1.);
+})";
 
-    const std::string FS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "precision mediump float;\n"
-        "out vec4 col;\n"
-        "void main()\n"
-        "{\n"
-        "    if (gl_ViewID_OVR == 0u) {\n"
-        "       col = vec4(1,0,0,1);\n"
-        "    } else if (gl_ViewID_OVR == 1u) {\n"
-        "       col = vec4(0,1,0,1);\n"
-        "    } else if (gl_ViewID_OVR == 2u) {\n"
-        "       col = vec4(0,0,1,1);\n"
-        "    } else {\n"
-        "       col = vec4(0,0,0,0);\n"
-        "    }\n"
-        "}\n";
+    const std::string FS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+precision mediump float;
+out vec4 col;
+void main()
+{
+    if (gl_ViewID_OVR == 0u) {
+       col = vec4(1,0,0,1);
+    } else if (gl_ViewID_OVR == 1u) {
+       col = vec4(0,1,0,1);
+    } else if (gl_ViewID_OVR == 2u) {
+       col = vec4(0,0,1,1);
+    } else {
+       col = vec4(0,0,0,0);
+    }
+})";
 
     updateFBOs(1, 1, 3);
     ANGLE_GL_PROGRAM(program, VS.c_str(), FS.c_str());
@@ -2341,29 +2360,25 @@ TEST_P(MultiviewLayeredRenderTest, RenderToSubrangeOfLayers)
         return;
     }
 
-    const std::string VS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "layout(num_views = 2) in;\n"
-        "in vec3 vPosition;\n"
-        "void main()\n"
-        "{\n"
-        "   gl_Position = vec4(vPosition, 1.);\n"
-        "}\n";
+    const std::string VS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+layout(num_views = 2) in;
+in vec3 vPosition;
+void main()
+{
+   gl_Position = vec4(vPosition, 1.);
+})";
 
-    const std::string FS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "precision mediump float;\n"
-        "out vec4 col;\n"
-        "void main()\n"
-        "{\n"
-        "     col = vec4(0,1,0,1);\n"
-        "}\n";
+    const std::string FS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+precision mediump float;
+out vec4 col;
+void main()
+{
+     col = vec4(0,1,0,1);
+})";
 
     updateFBOs(1, 1, 2, 4, 1);
     ANGLE_GL_PROGRAM(program, VS.c_str(), FS.c_str());
@@ -2391,39 +2406,35 @@ TEST_P(MultiviewRenderTest, FlatInterpolation)
         return;
     }
 
-    const std::string VS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "layout(num_views = 2) in;\n"
-        "in vec3 vPosition;\n"
-        "flat out int oInstanceID;\n"
-        "void main()\n"
-        "{\n"
-        "   gl_Position = vec4(vPosition, 1.);\n"
-        "   oInstanceID = gl_InstanceID;\n"
-        "}\n";
+    const std::string VS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+layout(num_views = 2) in;
+in vec3 vPosition;
+flat out int oInstanceID;
+void main()
+{
+   gl_Position = vec4(vPosition, 1.);
+   oInstanceID = gl_InstanceID;
+})";
 
-    const std::string FS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "precision mediump float;\n"
-        "flat in int oInstanceID;\n"
-        "out vec4 col;\n"
-        "void main()\n"
-        "{\n"
-        "    if (oInstanceID < 0) {\n"
-        "       discard;\n"
-        "    }\n"
-        "    if (gl_ViewID_OVR == 0u) {\n"
-        "       col = vec4(1,0,0,1);\n"
-        "    } else {\n"
-        "       col = vec4(0,1,0,1);\n"
-        "    }\n"
-        "}\n";
+    const std::string FS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+precision mediump float;
+flat in int oInstanceID;
+out vec4 col;
+void main()
+{
+    if (oInstanceID < 0) {
+       discard;
+    }
+    if (gl_ViewID_OVR == 0u) {
+       col = vec4(1,0,0,1);
+    } else {
+       col = vec4(0,1,0,1);
+    }
+})";
 
     updateFBOs(1, 1, 2);
     ANGLE_GL_PROGRAM(program, VS.c_str(), FS.c_str());
@@ -2445,36 +2456,32 @@ TEST_P(MultiviewRenderTest, FlatInterpolation2)
         return;
     }
 
-    const std::string VS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "layout(num_views = 2) in;\n"
-        "in vec3 vPosition;\n"
-        "flat out int flatVarying;\n"
-        "void main()\n"
-        "{\n"
-        "   gl_Position = vec4(vPosition, 1.);\n"
-        "   flatVarying = int(gl_ViewID_OVR);\n"
-        "}\n";
+    const std::string VS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+layout(num_views = 2) in;
+in vec3 vPosition;
+flat out int flatVarying;
+void main()
+{
+   gl_Position = vec4(vPosition, 1.);
+   flatVarying = int(gl_ViewID_OVR);
+})";
 
-    const std::string FS =
-        "#version 300 es\n"
-        "#extension " +
-        extensionName() +
-        ": require\n"
-        "precision mediump float;\n"
-        "flat in int flatVarying;\n"
-        "out vec4 col;\n"
-        "void main()\n"
-        "{\n"
-        "    if (flatVarying == 0) {\n"
-        "       col = vec4(1,0,0,1);\n"
-        "    } else {\n"
-        "       col = vec4(0,1,0,1);\n"
-        "    }\n"
-        "}\n";
+    const std::string FS = R"(#version 300 es
+#extension )" + extensionName() +
+                           R"( : require
+precision mediump float;
+flat in int flatVarying;
+out vec4 col;
+void main()
+{
+    if (flatVarying == 0) {
+       col = vec4(1,0,0,1);
+    } else {
+       col = vec4(0,1,0,1);
+    }
+})";
 
     updateFBOs(1, 1, 2);
     ANGLE_GL_PROGRAM(program, VS.c_str(), FS.c_str());
@@ -2586,18 +2593,15 @@ MultiviewRenderTestParams MultisampledVertexShaderVulkan(ExtensionName multiview
     return MultiviewRenderTestParams(2, VertexShaderVulkan(3, 1, multiviewExtension));
 }
 
-MultiviewRenderTestParams MultisampledVertexShaderD3D11(ExtensionName multiviewExtension)
-{
-    return MultiviewRenderTestParams(2, VertexShaderD3D11(3, 1, multiviewExtension));
-}
-
-#define ALL_VERTEX_SHADER_CONFIGS(minor)                         \
+#define ES31_CAPABLE_VERTEX_SHADER_CONFIGS(minor)                \
     VertexShaderOpenGL(3, minor, ExtensionName::multiview),      \
         VertexShaderVulkan(3, minor, ExtensionName::multiview),  \
-        VertexShaderD3D11(3, minor, ExtensionName::multiview),   \
         VertexShaderOpenGL(3, minor, ExtensionName::multiview2), \
-        VertexShaderVulkan(3, minor, ExtensionName::multiview2), \
-        VertexShaderD3D11(3, minor, ExtensionName::multiview2)
+        VertexShaderVulkan(3, minor, ExtensionName::multiview2)
+
+#define ES3_ONLY_VERTEX_SHADER_CONFIGS                                                        \
+    ES31_CAPABLE_VERTEX_SHADER_CONFIGS(0), VertexShaderD3D11(3, 0, ExtensionName::multiview), \
+        VertexShaderD3D11(3, 0, ExtensionName::multiview2)
 
 #define ALL_SINGLESAMPLE_CONFIGS()                                                              \
     VertexShaderOpenGL(ExtensionName::multiview), VertexShaderVulkan(ExtensionName::multiview), \
@@ -2609,15 +2613,13 @@ MultiviewRenderTestParams MultisampledVertexShaderD3D11(ExtensionName multiviewE
 #define ALL_MULTISAMPLE_CONFIGS()                                  \
     MultisampledVertexShaderOpenGL(ExtensionName::multiview),      \
         MultisampledVertexShaderVulkan(ExtensionName::multiview),  \
-        MultisampledVertexShaderD3D11(ExtensionName::multiview),   \
         MultisampledVertexShaderOpenGL(ExtensionName::multiview2), \
-        MultisampledVertexShaderVulkan(ExtensionName::multiview2), \
-        MultisampledVertexShaderD3D11(ExtensionName::multiview2)
+        MultisampledVertexShaderVulkan(ExtensionName::multiview2)
 
 ANGLE_INSTANTIATE_TEST_ES2_AND_ES3(MultiviewDependencyTest);
 
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(MultiviewDrawValidationTest);
-ANGLE_INSTANTIATE_TEST(MultiviewDrawValidationTest, ALL_VERTEX_SHADER_CONFIGS(1));
+ANGLE_INSTANTIATE_TEST(MultiviewDrawValidationTest, ES31_CAPABLE_VERTEX_SHADER_CONFIGS(1));
 
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(MultiviewRenderDualViewTest);
 ANGLE_INSTANTIATE_TEST(MultiviewRenderDualViewTest,
@@ -2637,7 +2639,7 @@ ANGLE_INSTANTIATE_TEST(MultiviewOcclusionQueryTest, ALL_SINGLESAMPLE_CONFIGS());
 
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(MultiviewProgramGenerationTest);
 ANGLE_INSTANTIATE_TEST(MultiviewProgramGenerationTest,
-                       ALL_VERTEX_SHADER_CONFIGS(0),
+                       ES3_ONLY_VERTEX_SHADER_CONFIGS,
                        GeomShaderD3D11(3, 0, ExtensionName::multiview),
                        GeomShaderD3D11(3, 0, ExtensionName::multiview2));
 

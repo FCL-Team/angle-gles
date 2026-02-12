@@ -78,6 +78,9 @@ function generate_Android_bp_file() {
             "angle_test_enable_system_egl = true"
             "build_angle_end2end_tests_library = true"
             "build_angle_trace_tests = false"
+
+            # Uncomment when we are ready to test IR in Android
+            # "angle_ir = true"
         )
 
         if [[ "$1" == "--enableApiTrace" ]]; then
@@ -177,9 +180,9 @@ delete_after_codegen_paths=(
    "third_party/android_system_sdk"
    "third_party/android_toolchain"
    "third_party/bazel"
+   "third_party/clspv/gn"
    "third_party/colorama"
    "third_party/jdk/current"  # subdirs only to keep third_party/jdk/BUILD.gn (not pulled by gclient as it comes from ANGLE repo)
-   "third_party/jdk/extras"
    "third_party/llvm-build"
    "third_party/proguard"
    "third_party/r8"

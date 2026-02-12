@@ -7,11 +7,16 @@
 // renderergl_utils.cpp: Conversion functions and other utility routines
 // specific to the OpenGL renderer.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+#    pragma allow_unsafe_buffers
+#endif
+
 #include "libANGLE/renderer/gl/renderergl_utils.h"
 
 #include <array>
 #include <limits>
 
+#include "GLSLANG/ShaderLang.h"
 #include "common/android_util.h"
 #include "common/mathutil.h"
 #include "common/platform.h"
@@ -205,6 +210,18 @@ bool IsPowerVrRogue(const FunctionsGL *functions)
     return angle::BeginsWith(nativeGLRenderer, powerVRRogue);
 }
 
+bool IsHuaweiMaleoon(const FunctionsGL *functions)
+{
+    const char *nativeGLVendor   = GetString(functions, GL_VENDOR);
+    const char *nativeGLRenderer = GetString(functions, GL_RENDERER);
+    return (std::string(nativeGLVendor).find("HUAWEI") != std::string::npos) &&
+           (std::string(nativeGLRenderer).find("Maleoon") != std::string::npos);
+}
+
+bool PrecisionMeetsSpecForHighpFloat(const gl::TypePrecision &precision)
+{
+    return precision.range[0] >= 62 && precision.range[1] >= 62 && precision.precision >= 16;
+}
 }  // namespace
 
 SwapControlData::SwapControlData()
@@ -275,68 +292,65 @@ uint32_t GetDeviceID(const FunctionsGL *functions)
     return 0;
 }
 
-ShShaderOutput GetShaderOutputType(const FunctionsGL *functions)
+ShShaderOutput GetShaderOutputType(const angle::FeaturesGL &features, const FunctionsGL *functions)
 {
     ASSERT(functions);
 
     if (functions->standard == STANDARD_GL_DESKTOP)
     {
         // GLSL outputs
-        if (functions->isAtLeastGL(gl::Version(4, 5)))
+        if (!features.emitMaxGlsl400ForTesting.enabled)
         {
-            return SH_GLSL_450_CORE_OUTPUT;
+            if (functions->isAtLeastGL(gl::Version(4, 5)))
+            {
+                return SH_GLSL_450_CORE_OUTPUT;
+            }
+            if (functions->isAtLeastGL(gl::Version(4, 4)))
+            {
+                return SH_GLSL_440_CORE_OUTPUT;
+            }
+            if (functions->isAtLeastGL(gl::Version(4, 3)))
+            {
+                return SH_GLSL_430_CORE_OUTPUT;
+            }
+            if (functions->isAtLeastGL(gl::Version(4, 2)))
+            {
+                return SH_GLSL_420_CORE_OUTPUT;
+            }
+            if (functions->isAtLeastGL(gl::Version(4, 1)))
+            {
+                return SH_GLSL_410_CORE_OUTPUT;
+            }
         }
-        else if (functions->isAtLeastGL(gl::Version(4, 4)))
-        {
-            return SH_GLSL_440_CORE_OUTPUT;
-        }
-        else if (functions->isAtLeastGL(gl::Version(4, 3)))
-        {
-            return SH_GLSL_430_CORE_OUTPUT;
-        }
-        else if (functions->isAtLeastGL(gl::Version(4, 2)))
-        {
-            return SH_GLSL_420_CORE_OUTPUT;
-        }
-        else if (functions->isAtLeastGL(gl::Version(4, 1)))
-        {
-            return SH_GLSL_410_CORE_OUTPUT;
-        }
-        else if (functions->isAtLeastGL(gl::Version(4, 0)))
+        if (functions->isAtLeastGL(gl::Version(4, 0)))
         {
             return SH_GLSL_400_CORE_OUTPUT;
         }
-        else if (functions->isAtLeastGL(gl::Version(3, 3)))
+        if (functions->isAtLeastGL(gl::Version(3, 3)))
         {
             return SH_GLSL_330_CORE_OUTPUT;
         }
-        else if (functions->isAtLeastGL(gl::Version(3, 2)))
+        if (functions->isAtLeastGL(gl::Version(3, 2)))
         {
             return SH_GLSL_150_CORE_OUTPUT;
         }
-        else if (functions->isAtLeastGL(gl::Version(3, 1)))
+        if (functions->isAtLeastGL(gl::Version(3, 1)))
         {
             return SH_GLSL_140_OUTPUT;
         }
-        else if (functions->isAtLeastGL(gl::Version(3, 0)))
+        if (functions->isAtLeastGL(gl::Version(3, 0)))
         {
             return SH_GLSL_130_OUTPUT;
         }
-        else
-        {
-            return SH_GLSL_COMPATIBILITY_OUTPUT;
-        }
+        return SH_GLSL_COMPATIBILITY_OUTPUT;
     }
-    else if (functions->standard == STANDARD_GL_ES)
+    if (functions->standard == STANDARD_GL_ES)
     {
         // ESSL outputs
         return SH_ESSL_OUTPUT;
     }
-    else
-    {
-        UNREACHABLE();
-        return ShShaderOutput(0);
-    }
+    UNREACHABLE();
+    return ShShaderOutput(0);
 }
 
 namespace nativegl_gl
@@ -596,6 +610,12 @@ static gl::TextureCaps GenerateTextureFormatCaps(const FunctionsGL *functions,
                     continue;
                 }
 
+                // Supporting MSAA=1 is not required on OpenGL for non-conformant drivers.
+                if (features.disableMSAASampleCount1.enabled && samples[sampleIndex] == 1)
+                {
+                    continue;
+                }
+
                 // Some NVIDIA drivers expose multisampling modes implemented as a combination of
                 // multisampling and supersampling. These are non-conformant and should not be
                 // exposed through ANGLE. Query which formats are conformant from the driver if
@@ -617,7 +637,15 @@ static gl::TextureCaps GenerateTextureFormatCaps(const FunctionsGL *functions,
                 }
                 if (conformant == GL_TRUE)
                 {
-                    textureCaps.sampleCounts.insert(samples[sampleIndex]);
+                    if (gl::isPow2(samples[sampleIndex]))
+                    {
+                        textureCaps.sampleCounts.insert(samples[sampleIndex]);
+                    }
+                    else
+                    {
+                        WARN() << "Skipping unexpected sample count " << samples[sampleIndex]
+                               << " for internal format " << gl::FmtHex(queryInternalFormat) << ".";
+                    }
                 }
             }
         }
@@ -629,7 +657,7 @@ static gl::TextureCaps GenerateTextureFormatCaps(const FunctionsGL *functions,
     const gl::InternalFormat &glFormatInfo = gl::GetSizedInternalFormatInfo(internalFormat);
     if (textureCaps.renderbuffer && !glFormatInfo.isInt() &&
         glFormatInfo.isRequiredRenderbufferFormat(gl::Version(3, 0)) &&
-        textureCaps.getMaxSamples() < 4)
+        textureCaps.sampleCounts.getMaxSamples() < 4)
     {
         LimitVersion(maxSupportedESVersion, gl::Version(2, 0));
     }
@@ -727,7 +755,6 @@ void GenerateCaps(const FunctionsGL *functions,
                   gl::Extensions *extensions,
                   gl::Limitations *limitations,
                   gl::Version *maxSupportedESVersion,
-                  MultiviewImplementationTypeGL *multiviewImplementationType,
                   ShPixelLocalStorageOptions *plsOptions)
 {
     // Start by assuming ES3.1 support and work down
@@ -923,6 +950,12 @@ void GenerateCaps(const FunctionsGL *functions,
         caps->fragmentHighpInt   = QueryTypePrecision(functions, GL_FRAGMENT_SHADER, GL_HIGH_INT);
         caps->fragmentMediumpInt = QueryTypePrecision(functions, GL_FRAGMENT_SHADER, GL_MEDIUM_INT);
         caps->fragmentLowpInt    = QueryTypePrecision(functions, GL_FRAGMENT_SHADER, GL_LOW_INT);
+
+        // highp support is required.
+        if (!PrecisionMeetsSpecForHighpFloat(caps->fragmentHighpFloat))
+        {
+            LimitVersion(maxSupportedESVersion, gl::Version(0, 0));
+        }
     }
     else
     {
@@ -1056,9 +1089,8 @@ void GenerateCaps(const FunctionsGL *functions,
         caps->maxCombinedShaderUniformComponents[gl::ShaderType::Fragment] =
             QuerySingleGLInt64(functions, GL_MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS);
 
-        // Clamp the maxUniformBlockSize to 64KB (majority of devices support up to this size
-        // currently), some drivers expose an excessively large value.
-        caps->maxUniformBlockSize = std::min<GLint64>(0x10000, caps->maxUniformBlockSize);
+        caps->maxUniformBlockSize =
+            std::min<GLint64>(gl::IMPLEMENTATION_MAX_UNIFORM_BLOCK_SIZE, caps->maxUniformBlockSize);
     }
     else
     {
@@ -1572,8 +1604,7 @@ void GenerateCaps(const FunctionsGL *functions,
     // TODO(crbug.com/776222): support Android and Apple devices.
     extensions->videoTextureWEBGL = !IsAndroid() && !IsApple();
 
-    if (functions->hasGLExtension("GL_ARB_shader_viewport_layer_array") ||
-        functions->hasGLExtension("GL_NV_viewport_array2"))
+    if (features.multiviewViaViewportArray.enabled)
     {
         extensions->multiviewOVR  = true;
         extensions->multiview2OVR = true;
@@ -1582,7 +1613,6 @@ void GenerateCaps(const FunctionsGL *functions,
         // GL_MAX_VIEWPORTS is guaranteed to be at least 16.
         const int maxViewports       = QuerySingleGLInt(functions, GL_MAX_VIEWPORTS);
         caps->maxViews               = static_cast<GLuint>(std::min(maxLayers, maxViewports));
-        *multiviewImplementationType = MultiviewImplementationTypeGL::NV_VIEWPORT_ARRAY2;
     }
 
     extensions->fboRenderMipmapOES = functions->isAtLeastGL(gl::Version(3, 0)) ||
@@ -1704,6 +1734,8 @@ void GenerateCaps(const FunctionsGL *functions,
         extensions->shaderPixelLocalStorageCoherentANGLE = true;
         plsOptions->type             = ShPixelLocalStorageType::FramebufferFetch;
         plsOptions->fragmentSyncType = ShFragmentSynchronizationType::Automatic;
+        plsOptions->supportsNoncoherent =
+            features.supportsShaderFramebufferFetchNonCoherentEXT.enabled;
     }
     else
     {
@@ -1760,17 +1792,20 @@ void GenerateCaps(const FunctionsGL *functions,
         }
         else if (features.supportsShaderFramebufferFetchNonCoherentEXT.enabled)
         {
+            ASSERT(plsOptions->fragmentSyncType == ShFragmentSynchronizationType::NotSupported);
             extensions->shaderPixelLocalStorageANGLE = true;
             plsOptions->type                         = ShPixelLocalStorageType::FramebufferFetch;
         }
         else if (hasFragmentShaderImageLoadStore)
         {
+            ASSERT(plsOptions->fragmentSyncType == ShFragmentSynchronizationType::NotSupported);
             extensions->shaderPixelLocalStorageANGLE = true;
             plsOptions->type                         = ShPixelLocalStorageType::ImageLoadStore;
             // OpenGL ES only allows read/write access to "r32*" images.
             plsOptions->supportsNativeRGBA8ImageFormats =
                 functions->standard != StandardGL::STANDARD_GL_ES;
         }
+        plsOptions->supportsNoncoherent = true;
     }
 
     // EXT_shader_framebuffer_fetch.
@@ -1970,13 +2005,15 @@ void GenerateCaps(const FunctionsGL *functions,
 
     // OES_draw_elements_base_vertex
     extensions->drawElementsBaseVertexOES =
-        functions->isAtLeastGL(gl::Version(3, 2)) || functions->isAtLeastGLES(gl::Version(3, 2)) ||
-        functions->hasGLESExtension("GL_OES_draw_elements_base_vertex");
+        !features.disableBaseInstanceVertex.enabled &&
+        (functions->isAtLeastGL(gl::Version(3, 2)) || functions->isAtLeastGLES(gl::Version(3, 2)) ||
+         functions->hasGLESExtension("GL_OES_draw_elements_base_vertex"));
 
     // EXT_draw_elements_base_vertex
     extensions->drawElementsBaseVertexEXT =
-        functions->isAtLeastGL(gl::Version(3, 2)) || functions->isAtLeastGLES(gl::Version(3, 2)) ||
-        functions->hasGLESExtension("GL_EXT_draw_elements_base_vertex");
+        !features.disableBaseInstanceVertex.enabled &&
+        (functions->isAtLeastGL(gl::Version(3, 2)) || functions->isAtLeastGLES(gl::Version(3, 2)) ||
+         functions->hasGLESExtension("GL_EXT_draw_elements_base_vertex"));
 
     // ANGLE_compressed_texture_etc
     // Expose this extension only when we support the formats or we're running on top of a native
@@ -2254,14 +2291,15 @@ void InitializeFeatures(const FunctionsGL *functions, angle::FeaturesGL *feature
     bool isGetSystemInfoSuccess =
         GetSystemInfoVendorIDAndDeviceID(functions, &systemInfo, &vendor, &device);
 
-    bool isAMD      = IsAMD(vendor);
-    bool isApple    = IsAppleGPU(vendor);
-    bool isIntel    = IsIntel(vendor);
-    bool isNvidia   = IsNvidia(vendor);
-    bool isQualcomm = IsQualcomm(vendor);
-    bool isVMWare   = IsVMWare(vendor);
-    bool hasAMD     = systemInfo.hasAMDGPU();
-    bool isMali     = IsARM(vendor);
+    bool isAMD           = IsAMD(vendor);
+    bool isApple         = IsAppleGPU(vendor);
+    bool isIntel         = IsIntel(vendor);
+    bool isNvidia        = IsNvidia(vendor);
+    bool isQualcomm      = IsQualcomm(vendor);
+    bool isVMWare        = IsVMWare(vendor);
+    bool hasAMD          = systemInfo.hasAMDGPU();
+    bool isMali          = IsARM(vendor);
+    bool isHuaweiMaleoon = IsHuaweiMaleoon(functions);
 
     std::array<int, 3> mesaVersion = {0, 0, 0};
     bool isMesa                    = IsMesa(functions, &mesaVersion);
@@ -2376,6 +2414,7 @@ void InitializeFeatures(const FunctionsGL *functions, angle::FeaturesGL *feature
     // 4 is a lowest common denominator that is always supported.
     ANGLE_FEATURE_CONDITION(features, limitMaxMSAASamplesTo4,
                             IsAndroid() || (IsApple() && (isIntel || isAMD || isNvidia)));
+    ANGLE_FEATURE_CONDITION(features, disableMSAASampleCount1, isHuaweiMaleoon);
     ANGLE_FEATURE_CONDITION(features, limitMax3dArrayTextureSizeTo1024,
                             isIntelLinuxLessThanKernelVersion5);
 
@@ -2519,12 +2558,12 @@ void InitializeFeatures(const FunctionsGL *functions, angle::FeaturesGL *feature
 
     ANGLE_FEATURE_CONDITION(features, promotePackedFormatsTo8BitPerChannel, IsApple() && hasAMD);
 
-    // crbug.com/1171371
+    // http://crbug.com/40166134
     // If output variable gl_FragColor is written by fragment shader, it may cause context lost with
     // Adreno 42x and 3xx.
     ANGLE_FEATURE_CONDITION(features, initFragmentOutputVariables, IsAdreno42xOr3xx(functions));
 
-    // http://crbug.com/1144207
+    // http://crbug.com/40155422
     // The Mac bot with Intel Iris GPU seems unaffected by this bug. Exclude the Haswell family for
     // now.
     ANGLE_FEATURE_CONDITION(features, shiftInstancedArrayDataWithOffset,
@@ -2622,6 +2661,10 @@ void InitializeFeatures(const FunctionsGL *functions, angle::FeaturesGL *feature
                             functions->isAtLeastGL(gl::Version(4, 5)) &&
                                 functions->hasGLExtension("GL_ARB_fragment_shader_interlock"));
 
+    ANGLE_FEATURE_CONDITION(features, multiviewViaViewportArray,
+                            functions->hasGLExtension("GL_ARB_shader_viewport_layer_array") ||
+                                functions->hasGLExtension("GL_NV_viewport_array2"));
+
     // EXT_shader_framebuffer_fetch
     ANGLE_FEATURE_CONDITION(features, supportsShaderFramebufferFetchEXT,
                             functions->hasGLESExtension("GL_EXT_shader_framebuffer_fetch"));
@@ -2651,8 +2694,10 @@ void InitializeFeatures(const FunctionsGL *functions, angle::FeaturesGL *feature
                             functions->standard == STANDARD_GL_ES && isMesa &&
                                 mesaVersion < (std::array<int, 3>{23, 1, 7}));
 
-    // http://anglebug.com/42266610
-    ANGLE_FEATURE_CONDITION(features, disableBaseInstanceVertex, IsMaliValhall(functions));
+    // Mali bug: http://anglebug.com/42266610
+    // Linux speculative bugs: http://crbug.com/427956856, http://anglebug.com/431097618
+    ANGLE_FEATURE_CONDITION(features, disableBaseInstanceVertex,
+                            IsMaliValhall(functions) || IsLinux());
 
     // Mali: http://crbug.com/40063287
     // Nvidia: http://crbug.com/328015191
@@ -2675,7 +2720,7 @@ void InitializeFeatures(const FunctionsGL *functions, angle::FeaturesGL *feature
 
     // BGRA formats do not appear to be accepted by the qualcomm driver despite the extension being
     // exposed.
-    ANGLE_FEATURE_CONDITION(features, bgraTexImageFormatsBroken, IsQualcomm(vendor));
+    ANGLE_FEATURE_CONDITION(features, bgraTexImageFormatsBroken, !isMesa && isQualcomm);
 
     // https://github.com/flutter/flutter/issues/47164
     // https://github.com/flutter/flutter/issues/47804
@@ -2698,6 +2743,14 @@ void InitializeFeatures(const FunctionsGL *functions, angle::FeaturesGL *feature
     // number of samples in currently bound FBO and require to reset sample
     // coverage each time FBO changes.
     ANGLE_FEATURE_CONDITION(features, resetSampleCoverageOnFBOChange, isQualcomm);
+
+    // Mali 400 series drivers fail linking shaders when passthrough shaders are enabled. Likely due
+    // to not querying correct information from varyings and uniforms.
+    ANGLE_FEATURE_CONDITION(features, disablePassthroughShaders, IsAdreno4xx(functions));
+
+    // IMG GL drivers crash in glClearTexImage on various format/type combinations such as packed
+    // types, LUMA and depth stencil.
+    ANGLE_FEATURE_CONDITION(features, disableClearTexImageForRobustInit, IsPowerVR(vendor));
 }
 
 void InitializeFrontendFeatures(const FunctionsGL *functions, angle::FrontendFeatures *features)
@@ -2708,8 +2761,10 @@ void InitializeFrontendFeatures(const FunctionsGL *functions, angle::FrontendFea
     std::array<int, 3> mesaVersion = {0, 0, 0};
     bool isMesa                    = IsMesa(functions, &mesaVersion);
 
+    // Program binaries don't contain transform feedback varyings on multiple vendors' GPUs.
+    // https://crbug.com/442879525 for the latest example on Imagination / PowerVR.
     ANGLE_FEATURE_CONDITION(features, disableProgramCachingForTransformFeedback,
-                            !isMesa && isQualcomm);
+                            (!isMesa && isQualcomm) || IsPowerVR(vendor));
     // https://crbug.com/480992
     // Disable shader program cache to workaround PowerVR Rogue issues.
     ANGLE_FEATURE_CONDITION(features, disableProgramBinary, IsPowerVrRogue(functions));
@@ -2725,6 +2780,14 @@ void InitializeFrontendFeatures(const FunctionsGL *functions, angle::FrontendFea
     ANGLE_FEATURE_CONDITION(features, linkJobIsThreadSafe, false);
 
     ANGLE_FEATURE_CONDITION(features, cacheCompiledShader, true);
+
+    // GL_EXT_clip_cull_distance and GL_NV_shader_noperspective_interpolation are broken on QCOM
+    // without ANGLE workarounds: the former does not allow built-in redeclarations outside of
+    // interface blocks and the latter does not compile unless the shader version is at least 310
+    // es.
+    ANGLE_FEATURE_CONDITION(features, clipCullDistanceBrokenWithPassthroughShaders, isQualcomm);
+    ANGLE_FEATURE_CONDITION(features, noperspectiveInterpolationBrokenWithPassthroughShaders,
+                            isQualcomm);
 }
 
 void ReInitializeFeaturesAtGPUSwitch(const FunctionsGL *functions, angle::FeaturesGL *features)

@@ -6,6 +6,10 @@
 
 // WebGLCompatibilityTest.cpp : Tests of the GL_ANGLE_webgl_compatibility extension.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+#    pragma allow_unsafe_buffers
+#endif
+
 #include "test_utils/ANGLETest.h"
 
 #include "common/mathutil.h"
@@ -66,6 +70,12 @@ class WebGLCompatibilityTest : public ANGLETest<>
         setConfigAlphaBits(8);
         setWebGLCompatibilityEnabled(true);
         setExtensionsEnabled(false);
+
+        mFloatTextureSamplingProgram                       = 0;
+        mFloatTextureSamplingProgram_texLocation           = -1;
+        mFloatTextureSamplingProgram_subtractorLocation    = -1;
+        mUniformColorRenderingProgram                      = 0;
+        mUniformColorRenderingProgram_colorUniformLocation = -1;
     }
 
     template <typename T>
@@ -110,8 +120,21 @@ void main()
     }
 })";
 
-        ANGLE_GL_PROGRAM(samplingProgram, kVS, kFS);
-        glUseProgram(samplingProgram);
+        if (mFloatTextureSamplingProgram == 0)
+        {
+            mFloatTextureSamplingProgram = CompileProgram(kVS, kFS);
+            ASSERT(mFloatTextureSamplingProgram != 0);
+            ASSERT_GL_NO_ERROR();
+
+            mFloatTextureSamplingProgram_texLocation =
+                glGetUniformLocation(mFloatTextureSamplingProgram, "tex");
+            ASSERT(mFloatTextureSamplingProgram_texLocation != -1);
+            mFloatTextureSamplingProgram_subtractorLocation =
+                glGetUniformLocation(mFloatTextureSamplingProgram, "subtractor");
+            ASSERT(mFloatTextureSamplingProgram_subtractorLocation != -1);
+            ASSERT_GL_NO_ERROR();
+        }
+        glUseProgram(mFloatTextureSamplingProgram);
 
         // Need RGBA8 renderbuffers for enough precision on the readback
         if (IsGLExtensionRequestable("GL_OES_rgb8_rgba8"))
@@ -164,16 +187,16 @@ void main()
         }
         ASSERT_GL_NO_ERROR();
 
-        glUniform1i(glGetUniformLocation(samplingProgram, "tex"), 0);
-        glUniform4fv(glGetUniformLocation(samplingProgram, "subtractor"), 1, floatData);
+        glUniform1i(mFloatTextureSamplingProgram_texLocation, 0);
+        glUniform4fv(mFloatTextureSamplingProgram_subtractorLocation, 1, floatData);
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        drawQuad(samplingProgram, "position", 0.5f, 1.0f, true);
+        drawQuad(mFloatTextureSamplingProgram, "position", 0.5f, 1.0f, true);
         EXPECT_PIXEL_COLOR_EQ(0, 0, GLColor::green);
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        drawQuad(samplingProgram, "position", 0.5f, 1.0f, true);
+        drawQuad(mFloatTextureSamplingProgram, "position", 0.5f, 1.0f, true);
 
         if (linearSamplingEnabled)
         {
@@ -202,14 +225,23 @@ void main()
         }
         ASSERT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, framebufferStatus);
 
-        ANGLE_GL_PROGRAM(renderingProgram, essl1_shaders::vs::Simple(),
-                         essl1_shaders::fs::UniformColor());
-        glUseProgram(renderingProgram);
+        if (mUniformColorRenderingProgram == 0)
+        {
+            mUniformColorRenderingProgram =
+                CompileProgram(essl1_shaders::vs::Simple(), essl1_shaders::fs::UniformColor());
+            ASSERT(mUniformColorRenderingProgram != 0);
+            ASSERT_GL_NO_ERROR();
 
-        glUniform4fv(glGetUniformLocation(renderingProgram, essl1_shaders::ColorUniform()), 1,
-                     floatData);
+            mUniformColorRenderingProgram_colorUniformLocation =
+                glGetUniformLocation(mUniformColorRenderingProgram, essl1_shaders::ColorUniform());
+            ASSERT(mUniformColorRenderingProgram_colorUniformLocation != -1);
+            ASSERT_GL_NO_ERROR();
+        }
+        glUseProgram(mUniformColorRenderingProgram);
 
-        drawQuad(renderingProgram, essl1_shaders::PositionAttrib(), 0.5f, 1.0f, true);
+        glUniform4fv(mUniformColorRenderingProgram_colorUniformLocation, 1, floatData);
+
+        drawQuad(mUniformColorRenderingProgram, essl1_shaders::PositionAttrib(), 0.5f, 1.0f, true);
 
         EXPECT_PIXEL_COLOR32F_NEAR(
             0, 0, GLColor32F(floatData[0], floatData[1], floatData[2], floatData[3]), 1.0f);
@@ -312,10 +344,59 @@ void main()
                                          GLenum expectedError,
                                          const char *explanation);
     void testCompressedTexImage(GLenum format);
+
+  private:
+    GLuint mFloatTextureSamplingProgram;
+    GLint mFloatTextureSamplingProgram_texLocation;
+    GLint mFloatTextureSamplingProgram_subtractorLocation;
+
+    GLuint mUniformColorRenderingProgram;
+    GLint mUniformColorRenderingProgram_colorUniformLocation;
 };
 
 class WebGL2CompatibilityTest : public WebGLCompatibilityTest
 {};
+
+class HardenedContextTest : public ANGLETest<>
+{
+  protected:
+    EGLContext setupHardenedContext()
+    {
+        EGLWindow *window                = getEGLWindow();
+        const EGLDisplay display         = window->getDisplay();
+        const EGLConfig config           = window->getConfig();
+        const EGLSurface surface         = window->getSurface();
+        const EGLint contextAttributes[] = {
+            EGL_CONTEXT_MAJOR_VERSION_KHR,
+            GetParam().majorVersion,
+            EGL_CONTEXT_MINOR_VERSION_KHR,
+            GetParam().minorVersion,
+            EGL_CONTEXT_HARDENED_ANGLE,
+            EGL_TRUE,
+            EGL_NONE,
+        };
+
+        mOriginalContext = eglGetCurrentContext();
+
+        EGLContext context = eglCreateContext(display, config, EGL_NO_CONTEXT, contextAttributes);
+        EXPECT_NE(context, EGL_NO_CONTEXT);
+        eglMakeCurrent(display, surface, surface, context);
+        return context;
+    }
+
+    void destroyHardenedContext(EGLContext context)
+    {
+        EGLWindow *window        = getEGLWindow();
+        const EGLDisplay display = window->getDisplay();
+        const EGLSurface surface = window->getSurface();
+
+        eglMakeCurrent(display, surface, surface, mOriginalContext);
+        eglDestroyContext(display, context);
+    }
+
+  private:
+    EGLContext mOriginalContext = EGL_NO_CONTEXT;
+};
 
 // Context creation would fail if EGL_ANGLE_create_context_webgl_compatibility was not available so
 // the GL extension should always be present
@@ -5303,10 +5384,9 @@ TEST_P(WebGLCompatibilityTest, EnableCompressedTextureExtensionLossyDecode)
 // This is an implementation-defined limit - crbug.com/1220237 .
 TEST_P(WebGLCompatibilityTest, ValidateArraySizes)
 {
-    // Note: on macOS with ANGLE's OpenGL backend, getting anywhere
-    // close to this limit causes pathologically slow shader
-    // compilation in the driver. For the "ok" case, therefore, use a
-    // fairly small array.
+    // Note: on macOS/Intel with ANGLE's OpenGL backend, loops are not used to initialize arrays, so
+    // getting anywhere close to this limit results in gigantic shaders that are too slow to
+    // compile. For the "ok" case, therefore, use a fairly small array.
     constexpr char kVSArrayOK[] =
         R"(varying vec4 color;
 const int array_size = 500;
@@ -5367,10 +5447,9 @@ void main()
 // This is an implementation-defined limit - crbug.com/1220237 .
 TEST_P(WebGLCompatibilityTest, ValidateStructSizes)
 {
-    // Note: on macOS with ANGLE's OpenGL backend, getting anywhere
-    // close to this limit causes pathologically slow shader
-    // compilation in the driver. For this reason, only perform a
-    // negative test.
+    // Note: on macOS/Intel with ANGLE's OpenGL backend, loops are not used to initialize arrays, so
+    // getting anywhere close to this limit results in gigantic shaders that are too slow to
+    // compile. For this reason, only perform a negative test.
     constexpr char kFSStructTooLarge[] =
         R"(precision mediump float;
 struct Light {
@@ -5857,7 +5936,7 @@ TEST_P(WebGL2CompatibilityTest, RenderToLevelsOfSampledTexture)
 }
 
 // Reject attempts to allocate too-large variables in shaders.
-// This is an implementation-defined limit - crbug.com/1220237 .
+// This is an implementation-defined limit - http://crbug.com/40056230.
 TEST_P(WebGL2CompatibilityTest, ValidateTypeSizes)
 {
     constexpr char kFSArrayBlockTooLarge[] = R"(#version 300 es
@@ -5882,8 +5961,38 @@ void main()
     EXPECT_EQ(0u, program);
 }
 
+// Similar to WebGL2CompatibilityTest.ValidateTypeSizes, but ensure the same validation is done in
+// non-webgl contexts with the EGL_CONTEXT_HARDENED_ANGLE flag.
+TEST_P(HardenedContextTest, ValidateTypeSizes)
+{
+    constexpr char kFSArrayBlockTooLarge[] = R"(#version 300 es
+precision mediump float;
+// 1 + the maximum size this implementation allows.
+uniform LargeArrayBlock {
+    vec4 large_array[134217729];
+};
+
+out vec4 out_FragColor;
+
+void main()
+{
+    if (large_array[1].x == 2.0)
+        out_FragColor = vec4(0.0, 1.0, 0.0, 1.0);
+    else
+        out_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+}
+)";
+
+    EGLContext hardenedContext = setupHardenedContext();
+
+    GLuint program = CompileProgram(essl3_shaders::vs::Simple(), kFSArrayBlockTooLarge);
+    EXPECT_EQ(0u, program);
+
+    destroyHardenedContext(hardenedContext);
+}
+
 // Ensure that new type size validation code added for
-// crbug.com/1220237 does not crash.
+// http://crbug.com/40056230 does not crash.
 TEST_P(WebGL2CompatibilityTest, ValidatingTypeSizesShouldNotCrash)
 {
     constexpr char kFS1[] = R"(#version 300 es
@@ -6926,4 +7035,7 @@ ANGLE_INSTANTIATE_TEST_ES2_AND_ES3(WebGLCompatibilityTest);
 
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WebGL2CompatibilityTest);
 ANGLE_INSTANTIATE_TEST_ES3(WebGL2CompatibilityTest);
+
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(HardenedContextTest);
+ANGLE_INSTANTIATE_TEST_ES3(HardenedContextTest);
 }  // namespace angle

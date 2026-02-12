@@ -168,10 +168,12 @@ void main() {
         o = vec4(1);
 })";
     const char kExpected[] = R"(#version 300 es
-struct sbbe {
+struct {
   highp vec3 _ud;
 } _ua;
-sbbe _ub;
+struct {
+  highp vec3 _ud;
+} _ub;
 out highp vec4 _uo;
 void main(){
   if (any(lessThan(_ua._ud, _ub._ud)))
@@ -195,10 +197,9 @@ void main() {
         o = vec4(1);
 })";
     const char kExpected[] = R"(#version 300 es
-struct sbbd {
+struct {
   highp vec3 _ud;
-};
-sbbd _ua;
+} _ua;
 out highp vec4 _uo;
 void main(){
   if (any(lessThan(_ua._ud, vec3(2.0, 2.0, 2.0))))
@@ -222,11 +223,12 @@ void main() {
         o = vec4(1);
 })";
     const char kExpected[] = R"(#version 300 es
-struct sbbe {
+struct {
   highp vec3 _ud;
-};
-sbbe _ua;
-sbbe _ub;
+} _ua;
+struct {
+  highp vec3 _ud;
+} _ub;
 out highp vec4 _uo;
 void main(){
   if (any(lessThan(_ua._ud, _ub._ud)))
@@ -352,13 +354,12 @@ void main(){
   gl_FragColor = g.e + s.f;
 })";
     compile(kShader);
-    const char kExpected[] = R"(struct sbbf {
+    const char kExpected[] = R"(struct {
   highp vec4 _ue;
-};
+} _ug;
 struct _usbbf {
   highp vec4 _uf;
 };
-sbbf _ug;
 void main(){
   _usbbf _us;
   (gl_FragColor = (_ug._ue + _us._uf));

@@ -6,6 +6,10 @@
 
 // translator_fuzzer.cpp: A libfuzzer fuzzer for the shader translator.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+#    pragma allow_unsafe_buffers
+#endif
+
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
@@ -111,6 +115,10 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
         hasUnsupportedOptions = hasUnsupportedOptions || hasMacGLSLOptions;
 #endif
     }
+    if (!IsOutputESSL(shaderOutput))
+    {
+        hasUnsupportedOptions = hasUnsupportedOptions || options.skipAllValidationAndTransforms;
+    }
     if (!IsOutputSPIRV(shaderOutput))
     {
         hasUnsupportedOptions = hasUnsupportedOptions || options.addVulkanXfbEmulationSupportCode ||
@@ -215,7 +223,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
         resources.EXT_frag_depth                  = 1;
         resources.EXT_shader_texture_lod          = 1;
         resources.EXT_shader_framebuffer_fetch    = 1;
-        resources.NV_shader_framebuffer_fetch     = 1;
         resources.ARM_shader_framebuffer_fetch    = 1;
         resources.ARM_shader_framebuffer_fetch_depth_stencil = 1;
         resources.EXT_YUV_target                  = 1;
@@ -239,9 +246,32 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 
     auto &translator = (*translators)[key];
 
+    // Enable options that any security-sensitive application should enable, otherwise it's easy to
+    // trigger various inactionable errors.
     options.limitExpressionComplexity = true;
+    options.limitCallStackDepth                     = true;
+    options.rejectWebglShadersWithLargeVariables    = true;
+    options.rejectWebglShadersWithUndefinedBehavior = true;
     const char *shaderStrings[]       = {reinterpret_cast<const char *>(data)};
-    translator->compile(shaderStrings, 1, options);
+
+    // Dump the string being passed to the compiler to ease debugging.
+    // The string is written char-by-char and unwanted characters are replaced with whitespace.
+    // This is because characters such as \r can hide the shader contents.
+    std::cerr << "\nCompile input with unprintable characters turned to whitespace:\n";
+    for (const char *c = shaderStrings[0]; *c; ++c)
+    {
+        if (*c < ' ' && *c != '\n')
+        {
+            std::cerr << ' ';
+        }
+        else
+        {
+            std::cerr << *c;
+        }
+    }
+    std::cerr << "\nEnd of compile input.\n\n";
+
+    translator->compile(shaderStrings, options);
 
     return 0;
 }

@@ -55,6 +55,9 @@ void WriteParamCaptureReplay(std::ostream &os, const CallCapture &call, const Pa
         case ParamType::TClipOrigin:
             WriteParamValueReplay<ParamType::TClipOrigin>(os, call, param.value.ClipOriginVal);
             break;
+        case ParamType::TCombinerOp:
+            WriteParamValueReplay<ParamType::TCombinerOp>(os, call, param.value.CombinerOpVal);
+            break;
         case ParamType::TCompositorTiming:
             WriteParamValueReplay<ParamType::TCompositorTiming>(os, call,
                                                                 param.value.CompositorTimingVal);
@@ -498,6 +501,9 @@ void WriteParamCaptureReplay(std::ostream &os, const CallCapture &call, const Pa
         case ParamType::TShadingModel:
             WriteParamValueReplay<ParamType::TShadingModel>(os, call, param.value.ShadingModelVal);
             break;
+        case ParamType::TShadingRate:
+            WriteParamValueReplay<ParamType::TShadingRate>(os, call, param.value.ShadingRateVal);
+            break;
         case ParamType::TSurfaceID:
             WriteParamValueReplay<ParamType::TSurfaceID>(os, call, param.value.SurfaceIDVal);
             break;
@@ -777,6 +783,10 @@ void WriteParamCaptureReplay(std::ostream &os, const CallCapture &call, const Pa
             WriteParamValueReplay<ParamType::Tcl_image_formatPointer>(
                 os, call, param.value.cl_image_formatPointerVal);
             break;
+        case ParamType::Tcl_import_properties_armConstPointer:
+            WriteParamValueReplay<ParamType::Tcl_import_properties_armConstPointer>(
+                os, call, param.value.cl_import_properties_armConstPointerVal);
+            break;
         case ParamType::Tcl_int:
             WriteParamValueReplay<ParamType::Tcl_int>(os, call, param.value.cl_intVal);
             break;
@@ -900,6 +910,8 @@ const char *ParamTypeToString(ParamType paramType)
         case ParamType::TClipDepthMode:
             return "GLenum";
         case ParamType::TClipOrigin:
+            return "GLenum";
+        case ParamType::TCombinerOp:
             return "GLenum";
         case ParamType::TCompositorTiming:
             return "GLenum";
@@ -1147,6 +1159,8 @@ const char *ParamTypeToString(ParamType paramType)
             return "GLenum";
         case ParamType::TShadingModel:
             return "GLenum";
+        case ParamType::TShadingRate:
+            return "GLenum";
         case ParamType::TSurfaceID:
             return "GLuint";
         case ParamType::TSyncID:
@@ -1299,6 +1313,8 @@ const char *ParamTypeToString(ParamType paramType)
             return "const cl_image_format *";
         case ParamType::Tcl_image_formatPointer:
             return "cl_image_format *";
+        case ParamType::Tcl_import_properties_armConstPointer:
+            return "const cl_import_properties_arm *";
         case ParamType::Tcl_int:
             return "cl_int";
         case ParamType::Tcl_intPointer:

@@ -7,6 +7,10 @@
 //    Implements the class methods for ContextMtl.
 //
 
+#ifdef UNSAFE_BUFFERS_BUILD
+#    pragma allow_unsafe_buffers
+#endif
+
 #include "libANGLE/renderer/metal/ContextMtl.h"
 
 #include <TargetConditionals.h>
@@ -1509,9 +1513,10 @@ BufferImpl *ContextMtl::createBuffer(const gl::BufferState &state)
 }
 
 // Vertex Array creation
-VertexArrayImpl *ContextMtl::createVertexArray(const gl::VertexArrayState &state)
+VertexArrayImpl *ContextMtl::createVertexArray(const gl::VertexArrayState &state,
+                                               const gl::VertexArrayBuffers &vertexArrayBuffers)
 {
-    return new VertexArrayMtl(state, this);
+    return new VertexArrayMtl(state, vertexArrayBuffers, this);
 }
 
 // Query and Fence creation
@@ -1662,7 +1667,7 @@ void ContextMtl::invalidateState(const gl::Context *context)
 {
     mDirtyBits.set();
 
-    invalidateDefaultAttributes(context->getStateCache().getActiveDefaultAttribsMask());
+    invalidateDefaultAttributes(context->getActiveDefaultAttribsMask());
 }
 
 void ContextMtl::invalidateDefaultAttribute(size_t attribIndex)
@@ -1770,27 +1775,6 @@ angle::Result ContextMtl::getIncompleteTexture(const gl::Context *context,
     return mIncompleteTextures.getIncompleteTexture(context, type, format, nullptr, textureOut);
 }
 
-void ContextMtl::endRenderEncoding(mtl::RenderCommandEncoder *encoder)
-{
-    // End any pending visibility query in the render pass
-    if (mOcclusionQuery)
-    {
-        disableActiveOcclusionQueryInRenderPass();
-    }
-
-    if (mBlitEncoder.valid())
-    {
-        mBlitEncoder.endEncoding();
-    }
-
-    mOcclusionQueryPool.prepareRenderPassVisibilityPoolBuffer(this);
-
-    encoder->endEncoding();
-
-    // Resolve visibility results
-    mOcclusionQueryPool.resolveVisibilityResults(this);
-}
-
 void ContextMtl::endBlitAndComputeEncoding()
 {
     if (mBlitEncoder.valid())
@@ -1817,13 +1801,20 @@ void ContextMtl::endEncoding(bool forceSaveRenderPassContent)
             mRenderEncoder.setStoreAction(MTLStoreActionStore);
         }
 
-        endRenderEncoding(&mRenderEncoder);
-    }
-    // End blit encoder after render encoder, as endRenderEncoding() might create a
-    // blit encoder to resolve the visibility results.
-    if (mBlitEncoder.valid())
-    {
-        mBlitEncoder.endEncoding();
+        disableActiveOcclusionQueryInRenderPass();
+
+        mOcclusionQueryPool.prepareRenderPassVisibilityPoolBuffer(this);
+
+        mRenderEncoder.endEncoding();
+
+        mOcclusionQueryPool.resolveVisibilityResults(this);
+
+        // End blit encoder after render encoder, as occlusion query pool might create a
+        // blit encoder to resolve the visibility results.
+        if (mBlitEncoder.valid())
+        {
+            mBlitEncoder.endEncoding();
+        }
     }
 }
 
@@ -1876,6 +1867,12 @@ angle::Result ContextMtl::finishCommandBuffer()
     return checkCommandBufferError();
 }
 
+void ContextMtl::addCommandBufferScheduledCallback(std::function<void()> callback)
+{
+    mCmdBuffer.cmdQueue().addCommandBufferScheduledCallback(mCmdBuffer.getQueueSerial(),
+                                                            std::move(callback));
+}
+
 bool ContextMtl::hasStartedRenderPass(const mtl::RenderPassDesc &desc)
 {
     return mRenderEncoder.valid() &&
@@ -1911,7 +1908,7 @@ mtl::RenderCommandEncoder *ContextMtl::getRenderPassCommandEncoder(const mtl::Re
     }
 
     endEncoding(false);
-
+    flushCommandBufferIfNeeded();
     ensureCommandBufferReady();
     ++mRenderPassesSinceFlush;
 
@@ -2007,7 +2004,7 @@ mtl::BlitCommandEncoder *ContextMtl::getBlitCommandEncoder()
         return &mBlitEncoder;
     }
 
-    endEncoding(true);
+    flushCommandBufferIfNeeded();
     ensureCommandBufferReady();
 
     return &mBlitEncoder.restart();
@@ -2038,7 +2035,7 @@ mtl::ComputeCommandEncoder *ContextMtl::getComputeCommandEncoder()
         return &mComputeEncoder;
     }
 
-    endEncoding(true);
+    flushCommandBufferIfNeeded();
     ensureCommandBufferReady();
 
     return &mComputeEncoder.restart();
@@ -2064,8 +2061,6 @@ mtl::ComputeCommandEncoder *ContextMtl::getIndexPreprocessingCommandEncoder()
 
 void ContextMtl::ensureCommandBufferReady()
 {
-    flushCommandBufferIfNeeded();
-
     if (!mCmdBuffer.ready())
     {
         mCmdBuffer.restart();
@@ -2392,7 +2387,7 @@ void ContextMtl::updateProgramExecutable(const gl::Context *context)
     // Need to rebind textures
     invalidateCurrentTextures();
     // Need to re-upload default attributes
-    invalidateDefaultAttributes(context->getStateCache().getActiveDefaultAttribsMask());
+    invalidateDefaultAttributes(context->getActiveDefaultAttribsMask());
     // Render pipeline need to be re-applied
     invalidateRenderPipeline();
 }
@@ -2401,7 +2396,7 @@ void ContextMtl::updateVertexArray(const gl::Context *context)
 {
     const gl::State &glState = getState();
     mVertexArray             = mtl::GetImpl(glState.getVertexArray());
-    invalidateDefaultAttributes(context->getStateCache().getActiveDefaultAttribsMask());
+    invalidateDefaultAttributes(context->getActiveDefaultAttribsMask());
     invalidateRenderPipeline();
 }
 
@@ -2517,7 +2512,7 @@ angle::Result ContextMtl::setupDrawImpl(const gl::Context *context,
     // instances=0 means no instanced draw.
     GLsizei instanceCount = instances ? instances : 1;
 
-    if (context->getStateCache().hasAnyActiveClientAttrib())
+    if (context->hasAnyActiveClientAttrib())
     {
         ANGLE_TRY(mVertexArray->updateClientAttribs(context, firstVertex, vertexOrIndexCount,
                                                     instanceCount, indexTypeOrNone, indices));
